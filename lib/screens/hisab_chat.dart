@@ -148,200 +148,224 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
 
     return Scaffold(
       backgroundColor: oledBg,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Top Navigation & Header
-            Padding(
-              padding: const EdgeInsets.only(
-                left: 12,
-                right: 14,
-                top: 4,
-                bottom: 2,
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      GestureDetector(
-                        onTap: _closeChatPage,
-                        behavior: HitTestBehavior.opaque,
-                        child: Container(
-                          padding: const EdgeInsets.all(6),
-                          decoration: const BoxDecoration(
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.arrow_back_ios_new_rounded,
-                            color: Color(0xFFA3A3A3),
-                            size: 18,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        widget.friendName,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: -0.2,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    width: 32,
-                    height: 32,
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.more_vert_rounded,
-                      color: Color(0xFFD4D4D4),
-                      size: 18,
-                    ),
-                  ),
-                ],
+      body: Stack(
+        children: [
+          // ----------------------------------------------------
+          // WhatsApp Style Subtle Dark Background Image Layer
+          // ----------------------------------------------------
+          Positioned.fill(
+            child: Opacity(
+              opacity:
+                  0.12, // 12% opacity keeps OLED pitch dark intact & readable
+              child: Image.asset(
+                'assets/images/chat_bg.png',
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) =>
+                    const SizedBox.shrink(), // Fallback if image not yet present
               ),
             ),
+          ),
 
-            // Net Balance Master Card
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: surfaceCard,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: borderCustom),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          widget.isLena ? "NET LENA HAI" : "NET DENA HAI",
-                          style: const TextStyle(
-                            color: Color(0xFFA3A3A3),
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.8,
+          // Main Foreground Chat UI
+          SafeArea(
+            child: Column(
+              children: [
+                // Top Navigation & Header
+                Padding(
+                  padding: const EdgeInsets.only(
+                    left: 12,
+                    right: 14,
+                    top: 4,
+                    bottom: 2,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Row(
+                        children: [
+                          GestureDetector(
+                            onTap: _closeChatPage,
+                            behavior: HitTestBehavior.opaque,
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: const BoxDecoration(
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.arrow_back_ios_new_rounded,
+                                color: Color(0xFFA3A3A3),
+                                size: 18,
+                              ),
+                            ),
                           ),
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.baseline,
-                          textBaseline: TextBaseline.alphabetic,
-                          children: [
-                            Text(
-                              "₹$cleanAmount",
-                              style: TextStyle(
-                                color: widget.isLena ? lenaGreen : denaRed,
-                                fontSize: 20,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.3,
-                              ),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              widget.isLena ? "(Receive)" : "(Pay)",
-                              style: TextStyle(
-                                color: widget.isLena
-                                    ? const Color(0xE634D399)
-                                    : const Color(0xE6FB7185),
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
-                      ),
-                      decoration: BoxDecoration(
-                        color: surfaceSecondary,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: borderCustom),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: const [
+                          const SizedBox(width: 4),
                           Text(
-                            "Details",
-                            style: TextStyle(
-                              color: Color(0xFFD4D4D4),
-                              fontSize: 11,
-                              fontWeight: FontWeight.w500,
+                            widget.friendName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: -0.2,
                             ),
-                          ),
-                          SizedBox(width: 4),
-                          Icon(
-                            Icons.keyboard_arrow_down_rounded,
-                            color: Color(0xFFD4D4D4),
-                            size: 14,
                           ),
                         ],
                       ),
-                    ),
-                  ],
+                      Container(
+                        width: 32,
+                        height: 32,
+                        alignment: Alignment.center,
+                        child: const Icon(
+                          Icons.more_vert_rounded,
+                          color: Color(0xFFD4D4D4),
+                          size: 18,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
 
-            // Scrollable Timeline Chat
-            Expanded(
-              child: ListView.builder(
-                controller: _scrollController,
-                physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: _messages.length,
-                itemBuilder: (context, index) {
-                  final msg = _messages[index];
-                  return Column(
-                    children: [
-                      if (msg["dateHeader"] != null)
-                        Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 2,
-                            ),
-                            decoration: BoxDecoration(
-                              color: surfaceSecondary.withOpacity(0.8),
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(
-                                color: borderCustom.withOpacity(0.7),
-                              ),
-                            ),
-                            child: Text(
-                              msg["dateHeader"],
+                // Net Balance Master Card
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
+                  child: Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: surfaceCard.withOpacity(0.95),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: borderCustom),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              widget.isLena ? "NET LENA HAI" : "NET DENA HAI",
                               style: const TextStyle(
                                 color: Color(0xFFA3A3A3),
-                                fontSize: 11,
-                                fontWeight: FontWeight.w600,
-                                letterSpacing: 0.5,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.8,
                               ),
                             ),
+                            const SizedBox(height: 4),
+                            Row(
+                              crossAxisAlignment: CrossAxisAlignment.baseline,
+                              textBaseline: TextBaseline.alphabetic,
+                              children: [
+                                Text(
+                                  "₹$cleanAmount",
+                                  style: TextStyle(
+                                    color: widget.isLena ? lenaGreen : denaRed,
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -0.3,
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  widget.isLena ? "(Receive)" : "(Pay)",
+                                  style: TextStyle(
+                                    color: widget.isLena
+                                        ? const Color(0xE634D399)
+                                        : const Color(0xE6FB7185),
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: surfaceSecondary,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(color: borderCustom),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: const [
+                              Text(
+                                "Details",
+                                style: TextStyle(
+                                  color: Color(0xFFD4D4D4),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                              SizedBox(width: 4),
+                              Icon(
+                                Icons.keyboard_arrow_down_rounded,
+                                color: Color(0xFFD4D4D4),
+                                size: 14,
+                              ),
+                            ],
                           ),
                         ),
-                      _buildTransactionCard(msg),
-                    ],
-                  );
-                },
-              ),
-            ),
+                      ],
+                    ),
+                  ),
+                ),
 
-            // Bottom Action Dock
-            _buildBottomDock(),
-          ],
-        ),
+                // Scrollable Timeline Chat
+                Expanded(
+                  child: ListView.builder(
+                    controller: _scrollController,
+                    physics: const BouncingScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      final msg = _messages[index];
+                      return Column(
+                        children: [
+                          if (msg["dateHeader"] != null)
+                            Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: surfaceSecondary.withOpacity(0.85),
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                    color: borderCustom.withOpacity(0.7),
+                                  ),
+                                ),
+                                child: Text(
+                                  msg["dateHeader"],
+                                  style: const TextStyle(
+                                    color: Color(0xFFA3A3A3),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.5,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          _buildTransactionCard(msg),
+                        ],
+                      );
+                    },
+                  ),
+                ),
+
+                // Bottom Action Dock
+                _buildBottomDock(),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -487,7 +511,9 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
-          color: isDiya ? const Color(0xFF121415) : surfaceCard,
+          color: (isDiya ? const Color(0xFF121415) : surfaceCard).withOpacity(
+            0.92,
+          ),
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
             bottomLeft: const Radius.circular(16),
@@ -608,9 +634,9 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
   Widget _buildBottomDock() {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-      decoration: const BoxDecoration(
-        color: oledBg,
-        border: Border(top: BorderSide(color: borderCustom)),
+      decoration: BoxDecoration(
+        color: oledBg.withOpacity(0.96),
+        border: const Border(top: BorderSide(color: borderCustom)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
