@@ -1,25 +1,22 @@
 class EntryFormStateData {
   String activeFilter; // 'all', 'lena', 'dena'
-  String txType; // 'diya' (Lena banta hai) ya 'liya' (Dena banta hai)
+  String txType; // 'diya' ya 'liya'
   String selectedPaymentMode;
-  String selectedTag;
+  String? selectedTag; // Nullable -> Tag chunna optional hai
   bool isAddAccordionOpen;
   final Set<dynamic> selectedFriendKeys;
+
+  // By default sirf 3 tags + runtime custom tags
+  List<String> availableTags;
 
   EntryFormStateData({
     this.activeFilter = 'all',
     this.txType = 'diya',
     this.selectedPaymentMode = 'UPI',
-    this.selectedTag = 'Roommate',
+    this.selectedTag, // By default koi zabardasti selected nahi
     this.isAddAccordionOpen = false,
     Set<dynamic>? selectedFriendKeys,
-  }) : selectedFriendKeys = selectedFriendKeys ?? {};
-
-  static const List<String> availableTags = [
-    'College',
-    'Roommate',
-    'Office',
-    'Business',
-    'Personal',
-  ];
+    List<String>? availableTags,
+  }) : selectedFriendKeys = selectedFriendKeys ?? {},
+       availableTags = availableTags ?? ['Personal', 'Business', 'College'];
 }

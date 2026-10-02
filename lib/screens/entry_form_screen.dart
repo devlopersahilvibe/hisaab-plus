@@ -54,13 +54,12 @@ class _EntryFormViewState extends State<EntryFormView> {
       transBox: _transBox,
     );
 
+    // Initial state: koi friend selected nahi aur koi tag selected nahi
     _stateData = EntryFormStateData(
       txType: widget.entryType == 2 ? 'liya' : 'diya',
+      selectedTag: null,
+      selectedFriendKeys: {},
     );
-
-    if (_friendsBox.isNotEmpty) {
-      _stateData.selectedFriendKeys.add(_friendsBox.keyAt(0));
-    }
   }
 
   @override
@@ -89,7 +88,7 @@ class _EntryFormViewState extends State<EntryFormView> {
       name: name,
       phone: _newFriendPhoneCtrl.text.trim(),
       note: _newFriendNoteCtrl.text.trim(),
-      tag: _stateData.selectedTag,
+      tag: _stateData.selectedTag ?? "",
     );
 
     setState(() {
@@ -98,6 +97,7 @@ class _EntryFormViewState extends State<EntryFormView> {
       _newFriendNameCtrl.clear();
       _newFriendPhoneCtrl.clear();
       _newFriendNoteCtrl.clear();
+      _stateData.selectedTag = null;
       _stateData.isAddAccordionOpen = false;
     });
 
@@ -251,9 +251,6 @@ class _EntryFormViewState extends State<EntryFormView> {
                 .where((f) => f.type == 'dena' && f.balance > 0)
                 .length;
 
-            // -------------------------------------------------------------
-            // DYNAMIC TAGS DETECTION & FILTER LIST CREATION
-            // -------------------------------------------------------------
             final List<FilterItem> filterItems = [
               FilterItem(
                 id: 'all',
@@ -275,8 +272,7 @@ class _EntryFormViewState extends State<EntryFormView> {
               ),
             ];
 
-            // Sabhi available tags me se check karo kis kis tag ke dost box me maujood hain
-            for (var tag in EntryFormStateData.availableTags) {
+            for (var tag in _stateData.availableTags) {
               final count = allFriends
                   .where(
                     (f) => f.desc.toLowerCase().contains(tag.toLowerCase()),
@@ -291,21 +287,20 @@ class _EntryFormViewState extends State<EntryFormView> {
 
             final query = _searchCtrl.text.trim().toLowerCase();
 
-            // Filtered entries list logic
             final List<MapEntry<dynamic, FriendModel>> filteredEntries = [];
             for (int i = 0; i < allFriends.length; i++) {
               final friend = allFriends[i];
               final key = allKeys[i];
 
-              // Base Filters
               if (_stateData.activeFilter == 'lena' &&
-                  (friend.type != 'lena' || friend.balance <= 0))
+                  (friend.type != 'lena' || friend.balance <= 0)) {
                 continue;
+              }
               if (_stateData.activeFilter == 'dena' &&
-                  (friend.type != 'dena' || friend.balance <= 0))
+                  (friend.type != 'dena' || friend.balance <= 0)) {
                 continue;
+              }
 
-              // Dynamic Tag Filter Check
               if (_stateData.activeFilter != 'all' &&
                   _stateData.activeFilter != 'lena' &&
                   _stateData.activeFilter != 'dena') {
@@ -316,7 +311,6 @@ class _EntryFormViewState extends State<EntryFormView> {
                 }
               }
 
-              // Search Query Match
               if (query.isNotEmpty) {
                 final matchName = friend.name.toLowerCase().contains(query);
                 final matchDesc = friend.desc.toLowerCase().contains(query);
@@ -355,7 +349,7 @@ class _EntryFormViewState extends State<EntryFormView> {
                 EntrySearchBarAndFilters(
                   searchCtrl: _searchCtrl,
                   activeFilter: _stateData.activeFilter,
-                  filterList: filterItems, // Dynamic List with Auto Tags
+                  filterList: filterItems,
                   onFilterChanged: (filter) =>
                       setState(() => _stateData.activeFilter = filter),
                   onSearchChanged: () => setState(() {}),
@@ -379,9 +373,22 @@ class _EntryFormViewState extends State<EntryFormView> {
                         phoneCtrl: _newFriendPhoneCtrl,
                         noteCtrl: _newFriendNoteCtrl,
                         selectedTag: _stateData.selectedTag,
-                        tags: EntryFormStateData.availableTags,
+                        tags: _stateData.availableTags,
                         onTagSelected: (tag) =>
                             setState(() => _stateData.selectedTag = tag),
+                        onCustomTagAdded: (newTag) {
+                          setState(() {
+                            if (!_stateData.availableTags.contains(newTag)) {
+                              _stateData.availableTags.add(newTag);
+                            }
+                            _stateData.selectedTag = newTag;
+                          });
+                          AppToast.show(
+                            context,
+                            title: "'$newTag' tag add ho gaya!",
+                            type: ToastType.success,
+                          );
+                        },
                         onCancel: () {
                           _newFriendNameCtrl.clear();
                           _newFriendPhoneCtrl.clear();
@@ -438,18 +445,7 @@ class _EntryFormViewState extends State<EntryFormView> {
                   onTxTypeChanged: (type) =>
                       setState(() => _stateData.txType = type),
                   onSave: _handleSaveHisaab,
-                  onReset: () {
-                    setState(() {
-                      _amountCtrl.clear();
-                      _noteCtrl.clear();
-                      _stateData.selectedFriendKeys.clear();
-                    });
-                    AppToast.show(
-                      context,
-                      title: "Entry reset kar di gayi!",
-                      type: ToastType.warning,
-                    );
-                  },
+                  onClosePage: widget.onClose, // ✕ Click par screen close hogi
                 ),
               ],
             );

@@ -10,17 +10,31 @@ class HisaabEntryService {
 
   HisaabEntryService({required this.friendsBox, required this.transBox});
 
-  /// Naya friend save karke uska generated key return karega
+  /// Naya friend save karke uska generated key return karega (Tag is optional)
   dynamic addNewFriend({
     required String name,
     required String phone,
     required String note,
     required String tag,
   }) {
+    final cleanNote = note.trim();
+    final cleanTag = tag.trim();
+
+    String finalDesc;
+    if (cleanTag.isNotEmpty && cleanNote.isNotEmpty) {
+      finalDesc = "$cleanNote • $cleanTag";
+    } else if (cleanTag.isNotEmpty) {
+      finalDesc = cleanTag;
+    } else if (cleanNote.isNotEmpty) {
+      finalDesc = cleanNote;
+    } else {
+      finalDesc = "Dost";
+    }
+
     final newFriend = FriendModel(
-      name: name,
-      phone: phone,
-      desc: note.isNotEmpty ? "$note • $tag" : "Naya Dost • $tag",
+      name: name.trim(),
+      phone: phone.trim(),
+      desc: finalDesc,
       balance: 0,
       type: 'settled',
       lastMessage: "Khata Banaya gaya",
@@ -38,8 +52,10 @@ class HisaabEntryService {
     required String note,
     required String paymentMode,
   }) {
+    if (selectedFriendKeys.isEmpty || totalAmount <= 0) return;
+
     final splitAmount = (totalAmount / selectedFriendKeys.length).round();
-    final noteText = note.isNotEmpty ? note : "Hisaab Entry";
+    final noteText = note.trim().isNotEmpty ? note.trim() : "Hisaab Entry";
     final now = DateTime.now();
     final dateStr =
         "${now.day}/${now.month} ${now.hour}:${now.minute.toString().padLeft(2, '0')}";
@@ -49,30 +65,40 @@ class HisaabEntryService {
       if (friend == null) continue;
 
       if (txType == 'diya') {
+        // Diya: Humne paise diye -> Humara lena banta hai (+ balance)
         if (friend.type == 'lena') {
           friend.balance += splitAmount;
         } else if (friend.type == 'dena') {
-          if (friend.balance >= splitAmount) {
+          if (friend.balance > splitAmount) {
             friend.balance -= splitAmount;
+          } else if (friend.balance == splitAmount) {
+            friend.balance = 0;
+            friend.type = 'settled';
           } else {
             friend.balance = splitAmount - friend.balance;
             friend.type = 'lena';
           }
         } else {
+          // settled or 0
           friend.balance = splitAmount;
           friend.type = 'lena';
         }
       } else {
+        // Liya: Humne paise liye -> Humara dena banta hai (- balance)
         if (friend.type == 'dena') {
           friend.balance += splitAmount;
         } else if (friend.type == 'lena') {
-          if (friend.balance >= splitAmount) {
+          if (friend.balance > splitAmount) {
             friend.balance -= splitAmount;
+          } else if (friend.balance == splitAmount) {
+            friend.balance = 0;
+            friend.type = 'settled';
           } else {
             friend.balance = splitAmount - friend.balance;
             friend.type = 'dena';
           }
         } else {
+          // settled or 0
           friend.balance = splitAmount;
           friend.type = 'dena';
         }
@@ -90,7 +116,7 @@ class HisaabEntryService {
 
       friend.save();
 
-      // Main Ledger Box Record
+      // Main Ledger Transactions Box Record
       transBox.add(
         TransactionModel(
           date: now,

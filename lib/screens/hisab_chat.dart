@@ -19,7 +19,7 @@ class HisabChatScreen extends StatefulWidget {
 }
 
 class _HisabChatScreenState extends State<HisabChatScreen> {
-  // Tailwind Exact Palette from HTML Template
+  // Tailwind Exact Palette
   static const Color oledBg = Color(0xFF000000);
   static const Color surfaceCard = Color(0xFF141416);
   static const Color surfaceSecondary = Color(0xFF18181B);
@@ -32,7 +32,6 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
   static const Color denaRed = Color(0xFFF43F5E);
   static const Color denaRedLight = Color(0xFFFB7185);
 
-  // States
   int _entryType = 0; // 0: Diya, 1: Liya
   String _selectedPaymentMode = "UPI";
   final TextEditingController _amountController = TextEditingController();
@@ -136,7 +135,6 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
     );
   }
 
-  // Action: Close Page & Navigate Back
   void _closeChatPage() {
     FocusScope.of(context).unfocus();
     Navigator.of(context).pop();
@@ -151,17 +149,31 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
       body: Stack(
         children: [
           // ----------------------------------------------------
-          // WhatsApp Style Subtle Dark Background Image Layer
+          // WhatsApp Style Subtle Dark Background Image Layer (FIXED VISIBILITY)
           // ----------------------------------------------------
           Positioned.fill(
             child: Opacity(
               opacity:
-                  0.12, // 12% opacity keeps OLED pitch dark intact & readable
+                  0.25, // 25% Opacity se pitch dark OLED me image clear dikhegi
               child: Image.asset(
                 'assets/images/chat_bg.png',
                 fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) =>
-                    const SizedBox.shrink(), // Fallback if image not yet present
+                repeat: ImageRepeat.repeat,
+                errorBuilder: (context, error, stackTrace) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Text(
+                        "Image Not Found: assets/images/chat_bg.png check karein!",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Colors.redAccent.withOpacity(0.5),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ),
@@ -233,7 +245,7 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
                   child: Container(
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: surfaceCard.withOpacity(0.95),
+                      color: surfaceCard.withOpacity(0.88),
                       borderRadius: BorderRadius.circular(16),
                       border: Border.all(color: borderCustom),
                     ),
@@ -385,7 +397,7 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
             gradient: const LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: [Color(0xFF122419), Color(0xFF0F1D14)],
+              colors: [Color(0xF0122419), Color(0xF00F1D14)],
             ),
             borderRadius: const BorderRadius.only(
               topLeft: Radius.circular(16),
@@ -512,7 +524,7 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           color: (isDiya ? const Color(0xFF121415) : surfaceCard).withOpacity(
-            0.92,
+            0.88,
           ),
           borderRadius: BorderRadius.only(
             topLeft: const Radius.circular(16),
@@ -630,7 +642,6 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
     );
   }
 
-  // Bottom Action Dock with Functional ✕ Button
   Widget _buildBottomDock() {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
@@ -843,7 +854,7 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
 
           const SizedBox(height: 10),
 
-          // Row 3: Amount + Save + Close Button (Closes Page)
+          // Row 3: Amount + Save + Close Button
           Row(
             children: [
               Expanded(
@@ -931,7 +942,7 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
 
               const SizedBox(width: 10),
 
-              // ✕ Close Button (Directly Closes Chat Screen)
+              // ✕ Close Button
               GestureDetector(
                 onTap: _closeChatPage,
                 child: Container(
@@ -956,7 +967,6 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
 
           const SizedBox(height: 12),
 
-          // Home Drag Bar
           Container(
             width: 128,
             height: 4,

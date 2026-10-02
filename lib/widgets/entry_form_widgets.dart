@@ -16,6 +16,23 @@ const Color neutral500 = Color(0xFF71717A);
 const Color neutral600 = Color(0xFF52525B);
 
 // -------------------------------------------------------------
+// FILTER ITEM MODEL
+// -------------------------------------------------------------
+class FilterItem {
+  final String id;
+  final String label;
+  final int count;
+  final String type;
+
+  FilterItem({
+    required this.id,
+    required this.label,
+    required this.count,
+    required this.type,
+  });
+}
+
+// -------------------------------------------------------------
 // 1. TOP NAVIGATION HEADER
 // -------------------------------------------------------------
 class EntryTopNavHeader extends StatelessWidget {
@@ -89,20 +106,6 @@ class EntryTopNavHeader extends StatelessWidget {
 // -------------------------------------------------------------
 // 2. SEARCH & DYNAMIC FILTER PILLS BAR
 // -------------------------------------------------------------
-class FilterItem {
-  final String id; // 'all', 'lena', 'dena', ya tag name jaise 'Roommate'
-  final String label; // "Sabhi", "Lena Hai", "Office"
-  final int count;
-  final String type; // 'all', 'lena', 'dena', 'tag'
-
-  FilterItem({
-    required this.id,
-    required this.label,
-    required this.count,
-    required this.type,
-  });
-}
-
 class EntrySearchBarAndFilters extends StatelessWidget {
   final TextEditingController searchCtrl;
   final String activeFilter;
@@ -130,7 +133,7 @@ class EntrySearchBarAndFilters extends StatelessWidget {
     } else if (item.type == 'dena') {
       textColor = const Color(0xFFFB7185);
     } else if (item.type == 'tag') {
-      textColor = const Color(0xFF38BDF8); // Subtle Cyan for tags
+      textColor = const Color(0xFF38BDF8);
     }
 
     return GestureDetector(
@@ -252,9 +255,10 @@ class AddFriendAccordionWidget extends StatelessWidget {
   final TextEditingController nameCtrl;
   final TextEditingController phoneCtrl;
   final TextEditingController noteCtrl;
-  final String selectedTag;
+  final String? selectedTag;
   final List<String> tags;
-  final ValueChanged<String> onTagSelected;
+  final ValueChanged<String?> onTagSelected;
+  final ValueChanged<String> onCustomTagAdded;
   final VoidCallback onCancel;
   final VoidCallback onSubmit;
 
@@ -268,9 +272,87 @@ class AddFriendAccordionWidget extends StatelessWidget {
     required this.selectedTag,
     required this.tags,
     required this.onTagSelected,
+    required this.onCustomTagAdded,
     required this.onCancel,
     required this.onSubmit,
   });
+
+  void _showAddCustomTagDialog(BuildContext context) {
+    final TextEditingController customTagCtrl = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return AlertDialog(
+          backgroundColor: surfaceCard,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+            side: const BorderSide(color: borderCustom),
+          ),
+          title: const Text(
+            "Naya Custom Tag Banayein",
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          content: Container(
+            height: 42,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            decoration: BoxDecoration(
+              color: surfaceSec,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderCustom),
+            ),
+            child: TextField(
+              controller: customTagCtrl,
+              autofocus: true,
+              style: const TextStyle(color: Colors.white, fontSize: 13),
+              decoration: const InputDecoration(
+                hintText: "Tag ka naam (e.g. Gym, Flatmate)...",
+                hintStyle: TextStyle(color: neutral500, fontSize: 12),
+                border: InputBorder.none,
+                isDense: true,
+              ),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text(
+                "Cancel",
+                style: TextStyle(color: neutral400, fontSize: 12),
+              ),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: lenaGreen,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 0,
+              ),
+              onPressed: () {
+                final tagVal = customTagCtrl.text.trim();
+                if (tagVal.isNotEmpty) {
+                  onCustomTagAdded(tagVal);
+                }
+                Navigator.pop(ctx);
+              },
+              child: const Text(
+                "Add Tag",
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
 
   Widget _buildFormInput({
     required TextEditingController controller,
@@ -447,52 +529,93 @@ class AddFriendAccordionWidget extends StatelessWidget {
                     icon: Icons.notes_rounded,
                   ),
                   const SizedBox(height: 10),
+
+                  // Tag Header (No extra button, clean and minimal)
                   const Text(
-                    "Tag Chunein",
+                    "Tag Chunein (Optional)",
                     style: TextStyle(color: neutral400, fontSize: 11),
                   ),
                   const SizedBox(height: 6),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
-                      children: tags.map((tag) {
-                        final isSel = selectedTag == tag;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: GestureDetector(
-                            onTap: () => onTagSelected(tag),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 10,
-                                vertical: 4,
-                              ),
-                              decoration: BoxDecoration(
-                                color: isSel
-                                    ? const Color(0xFF0F291C)
-                                    : surfaceSec,
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: isSel
-                                      ? lenaGreen.withOpacity(0.6)
-                                      : borderCustom,
+                      children: [
+                        ...tags.map((tag) {
+                          final isSel = selectedTag == tag;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 6),
+                            child: GestureDetector(
+                              onTap: () {
+                                onTagSelected(isSel ? null : tag);
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 10,
+                                  vertical: 4,
                                 ),
-                              ),
-                              child: Text(
-                                tag,
-                                style: TextStyle(
+                                decoration: BoxDecoration(
                                   color: isSel
-                                      ? const Color(0xFF34D399)
-                                      : neutral300,
-                                  fontSize: 11,
-                                  fontWeight: isSel
-                                      ? FontWeight.bold
-                                      : FontWeight.normal,
+                                      ? const Color(0xFF0F291C)
+                                      : surfaceSec,
+                                  borderRadius: BorderRadius.circular(20),
+                                  border: Border.all(
+                                    color: isSel
+                                        ? lenaGreen.withOpacity(0.6)
+                                        : borderCustom,
+                                  ),
+                                ),
+                                child: Text(
+                                  tag,
+                                  style: TextStyle(
+                                    color: isSel
+                                        ? const Color(0xFF34D399)
+                                        : neutral300,
+                                    fontSize: 11,
+                                    fontWeight: isSel
+                                        ? FontWeight.bold
+                                        : FontWeight.normal,
+                                  ),
                                 ),
                               ),
                             ),
+                          );
+                        }),
+                        GestureDetector(
+                          onTap: () => _showAddCustomTagDialog(context),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF0C1929),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: const Color(0xFF0284C7).withOpacity(0.4),
+                              ),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.add_rounded,
+                                  size: 12,
+                                  color: Color(0xFF38BDF8),
+                                ),
+                                SizedBox(width: 3),
+                                Text(
+                                  "Custom",
+                                  style: TextStyle(
+                                    color: Color(0xFF38BDF8),
+                                    fontSize: 11,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
-                        );
-                      }).toList(),
+                        ),
+                      ],
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -508,6 +631,7 @@ class AddFriendAccordionWidget extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               backgroundColor: surfaceSec,
+                              padding: EdgeInsets.zero,
                             ),
                             onPressed: onCancel,
                             child: const Text(
@@ -528,26 +652,33 @@ class AddFriendAccordionWidget extends StatelessWidget {
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               elevation: 0,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                              ),
                             ),
                             onPressed: onSubmit,
-                            child: const Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  "Dost Save Karein",
-                                  style: TextStyle(
-                                    color: Colors.black,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
+                            child: FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Text(
+                                    "Dost Save Karein",
+                                    style: TextStyle(
+                                      color: Colors.black,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 12,
+                                    ),
                                   ),
-                                ),
-                                SizedBox(width: 4),
-                                Icon(
-                                  Icons.check_rounded,
-                                  color: Colors.black,
-                                  size: 16,
-                                ),
-                              ],
+                                  SizedBox(width: 4),
+                                  Icon(
+                                    Icons.check_rounded,
+                                    color: Colors.black,
+                                    size: 16,
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ),
@@ -720,7 +851,7 @@ class SelectableFriendCardWidget extends StatelessWidget {
 }
 
 // -------------------------------------------------------------
-// 5. BOTTOM ENTRY DOCK BAR
+// 5. BOTTOM ENTRY DOCK BAR (✕ Button closes page)
 // -------------------------------------------------------------
 class EntryBottomDockWidget extends StatelessWidget {
   final String activeFriendName;
@@ -734,7 +865,7 @@ class EntryBottomDockWidget extends StatelessWidget {
   final VoidCallback onPaymentModeTap;
   final ValueChanged<String> onTxTypeChanged;
   final VoidCallback onSave;
-  final VoidCallback onReset;
+  final VoidCallback onClosePage;
 
   const EntryBottomDockWidget({
     super.key,
@@ -749,7 +880,7 @@ class EntryBottomDockWidget extends StatelessWidget {
     required this.onPaymentModeTap,
     required this.onTxTypeChanged,
     required this.onSave,
-    required this.onReset,
+    required this.onClosePage,
   });
 
   @override
@@ -763,7 +894,6 @@ class EntryBottomDockWidget extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Top Status Row
           Padding(
             padding: const EdgeInsets.only(bottom: 10, left: 2, right: 2),
             child: Row(
@@ -828,8 +958,6 @@ class EntryBottomDockWidget extends StatelessWidget {
               ],
             ),
           ),
-
-          // Row 1: Note Input & Embedded UPI Dropdown
           Container(
             height: 46,
             padding: const EdgeInsets.only(left: 12, right: 6),
@@ -900,8 +1028,6 @@ class EntryBottomDockWidget extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-
-          // Row 2: Diya / Liya Segmented Switcher
           Container(
             height: 44,
             padding: const EdgeInsets.all(4),
@@ -1004,8 +1130,6 @@ class EntryBottomDockWidget extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 10),
-
-          // Row 3: Amount Field + Solid White Save Pill + Round Close Button
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
@@ -1085,8 +1209,10 @@ class EntryBottomDockWidget extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
+
+              // ✕ Button: Seedha screen close karega
               GestureDetector(
-                onTap: onReset,
+                onTap: onClosePage,
                 child: Container(
                   width: 48,
                   height: 48,

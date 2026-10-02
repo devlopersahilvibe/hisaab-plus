@@ -6,6 +6,7 @@ import 'models/friend_model.dart';
 import 'screens/home_screen.dart';
 import 'screens/khata_screen.dart';
 import 'screens/entry_form_screen.dart';
+import 'screens/profile_screen.dart';
 import 'widgets/bottom_nav_bar.dart';
 
 void main() async {
@@ -16,6 +17,7 @@ void main() async {
   Hive.registerAdapter(TransactionModelAdapter());
   Hive.registerAdapter(FriendModelAdapter());
 
+  // Database boxes open karo
   await Hive.openBox<TransactionModel>('transactions_box');
   await Hive.openBox<FriendModel>('friends_box');
 
@@ -29,7 +31,7 @@ class HisaabApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'HISAAB+ v4.0.0',
+      title: 'HISAAB+ v4.3.0',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF000000), // OLED Pitch Black
       ),
@@ -65,18 +67,18 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          // Screens Switcher (Fixed recursion bug)
+          // Screens Switcher (State persistent aur bottom bar persist rahega)
           IndexedStack(
             index: _activeTab,
-            children: const [
-              HomeScreen(),
-              DostKhataScreen(), // Yahan sahi screen attach kar di gayi hai
-              Center(
-                child: Text(
-                  "Profile Screen (Coming Soon)",
-                  style: TextStyle(color: Colors.white70, fontSize: 16),
-                ),
+            children: [
+              HomeScreen(
+                onTabChange: (index) {
+                  setState(() => _activeTab = index);
+                },
+                onOpenEntry: _openQuickEntry,
               ),
+              const DostKhataScreen(),
+              const ProfileScreen(), // Nayi feature-rich Profile screen attach ho gayi
             ],
           ),
 

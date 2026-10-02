@@ -1,11 +1,15 @@
 import 'package:flutter/material.dart';
 
 import '../widgets/custom_toast.dart';
+import 'entry_form_screen.dart';
 import 'hisab_chat.dart';
 import 'khata_screen.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  final ValueChanged<int>? onTabChange;
+  final VoidCallback? onOpenEntry;
+
+  const HomeScreen({super.key, this.onTabChange, this.onOpenEntry});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -22,6 +26,9 @@ class _HomeScreenState extends State<HomeScreen> {
   static const Color redPillBg = Color(0xFF2E1215);
   static const Color textMuted = Color(0xFF888890);
   static const Color textMutedDark = Color(0xFF55555C);
+
+  final TextEditingController _searchCtrl = TextEditingController();
+  String _searchQuery = "";
 
   // Sample History Data
   final List<Map<String, dynamic>> _historyItems = [
@@ -51,6 +58,12 @@ class _HomeScreenState extends State<HomeScreen> {
     },
   ];
 
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
   void _openChat(Map<String, dynamic> item) {
     Navigator.push(
       context,
@@ -64,15 +77,44 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Issue 2 Fix: Agar MainNavigationScreen se callback aaya hai toh Tab 1 par switch karega (NavBar gayab nahi hoga)
   void _openKhata() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const DostKhataScreen()),
-    );
+    if (widget.onTabChange != null) {
+      widget.onTabChange!(1); // Tab 1 = Khata Tab
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const DostKhataScreen()),
+      );
+    }
+  }
+
+  // Issue 3 Fix: Naya Kharcha kholne ke liye EntryFormView screen open karna
+  void _openNayaKharcha() {
+    if (widget.onOpenEntry != null) {
+      widget.onOpenEntry!();
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => EntryFormView(
+            entryType: 0, // 0: Kharcha
+            onClose: () => Navigator.pop(context),
+          ),
+        ),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final filteredHistory = _historyItems.where((item) {
+      if (_searchQuery.isEmpty) return true;
+      final q = _searchQuery.toLowerCase();
+      return item["name"].toString().toLowerCase().contains(q) ||
+          item["timeOrDesc"].toString().toLowerCase().contains(q);
+    }).toList();
+
     return Scaffold(
       backgroundColor: oledBg,
       body: SafeArea(
@@ -82,7 +124,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Top Bar: Brand Title & Search Pill
+              // 1. Top Bar: Brand Title & Clickable Search Pill + 3-Dot Menu
               Padding(
                 padding: const EdgeInsets.only(top: 4, bottom: 6),
                 child: Row(
@@ -126,25 +168,56 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                         child: Row(
-                          children: const [
-                            Icon(
+                          children: [
+                            const Icon(
                               Icons.search_rounded,
                               size: 18,
                               color: textMuted,
                             ),
-                            SizedBox(width: 10),
+                            const SizedBox(width: 8),
+                            // Clickable editable TextField
                             Expanded(
-                              child: Text(
-                                "Search dost, kharcha...",
-                                style: TextStyle(
-                                  color: textMuted,
+                              child: TextField(
+                                controller: _searchCtrl,
+                                onChanged: (val) {
+                                  setState(() {
+                                    _searchQuery = val.trim();
+                                  });
+                                },
+                                style: const TextStyle(
+                                  color: Colors.white,
                                   fontSize: 12.5,
-                                  fontWeight: FontWeight.w400,
                                 ),
-                                overflow: TextOverflow.ellipsis,
+                                decoration: InputDecoration(
+                                  hintText: "Search dost, kharcha...",
+                                  hintStyle: const TextStyle(
+                                    color: textMuted,
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                  suffixIcon: _searchCtrl.text.isNotEmpty
+                                      ? GestureDetector(
+                                          onTap: () {
+                                            _searchCtrl.clear();
+                                            setState(() => _searchQuery = "");
+                                          },
+                                          child: const Icon(
+                                            Icons.close_rounded,
+                                            size: 16,
+                                            color: textMuted,
+                                          ),
+                                        )
+                                      : null,
+                                  suffixIconConstraints: const BoxConstraints(
+                                    minHeight: 18,
+                                    minWidth: 18,
+                                  ),
+                                ),
                               ),
                             ),
-                            Padding(
+                            const Padding(
                               padding: EdgeInsets.symmetric(horizontal: 4),
                               child: Text(
                                 "|",
@@ -154,11 +227,80 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ),
                             ),
-                            SizedBox(width: 4),
-                            Icon(
-                              Icons.more_vert_rounded,
-                              size: 18,
-                              color: textMuted,
+                            // Clickable 3-Dot Popup Menu
+                            Theme(
+                              data: Theme.of(context)
+                                  .copyWith(cardColor: const Color(0xFF1E1E22)),
+                              child: PopupMenuButton<String>(
+                                icon: const Icon(
+                                  Icons.more_vert_rounded,
+                                  size: 18,
+                                  color: textMuted,
+                                ),
+                                padding: EdgeInsets.zero,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                onSelected: (value) {
+                                  if (value == "settings") {
+                                    AppToast.show(
+                                      context,
+                                      title: "Settings jald aa raha hai!",
+                                      type: ToastType.info,
+                                    );
+                                  } else if (value == "sync") {
+                                    AppToast.show(
+                                      context,
+                                      title: "Cloud sync shuru ho gaya!",
+                                      type: ToastType.success,
+                                    );
+                                  }
+                                },
+                                itemBuilder: (BuildContext context) => [
+                                  const PopupMenuItem(
+                                    value: "sync",
+                                    height: 38,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.sync_rounded,
+                                          size: 16,
+                                          color: greenAccent,
+                                        ),
+                                        SizedBox(width: 10),
+                                        Text(
+                                          "Sync Now",
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: "settings",
+                                    height: 38,
+                                    child: Row(
+                                      children: [
+                                        Icon(
+                                          Icons.settings_outlined,
+                                          size: 16,
+                                          color: textMuted,
+                                        ),
+                                        SizedBox(width: 10),
+                                        Text(
+                                          "Settings",
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12.5,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
@@ -314,13 +456,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         const SizedBox(width: 12),
                         Expanded(
                           child: InkWell(
-                            onTap: () {
-                              AppToast.show(
-                                context,
-                                title: "Naya Kharcha jod rahe hain...",
-                                type: ToastType.info,
-                              );
-                            },
+                            onTap: _openNayaKharcha, // Opens EntryFormView now!
                             borderRadius: BorderRadius.circular(26),
                             child: Container(
                               height: 48,
@@ -368,7 +504,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 child: Stack(
                   children: [
-                    Positioned(
+                    const Positioned(
                       right: 0,
                       top: 0,
                       child: Icon(
@@ -456,15 +592,12 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   InkWell(
-                    onTap: _openKhata,
+                    onTap: _openKhata, // Navigates to Khata tab
                     borderRadius: BorderRadius.circular(12),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 4,
-                        vertical: 2,
-                      ),
+                    child: const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                       child: Row(
-                        children: const [
+                        children: [
                           Text(
                             "All Khata",
                             style: TextStyle(
@@ -489,17 +622,28 @@ class _HomeScreenState extends State<HomeScreen> {
               const SizedBox(height: 12),
 
               // 5. History Tiles
-              ..._historyItems.map((item) {
-                return _buildHistoryTile(
-                  initials: item["initials"],
-                  name: item["name"],
-                  timeOrDesc: item["timeOrDesc"],
-                  amount: "₹${item["amount"]}",
-                  status: item["status"],
-                  isLena: item["isLena"],
-                  onTap: () => _openChat(item),
-                );
-              }),
+              if (filteredHistory.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 30),
+                  child: Center(
+                    child: Text(
+                      "Koi hisaab nahi mila",
+                      style: TextStyle(color: textMuted, fontSize: 13),
+                    ),
+                  ),
+                )
+              else
+                ...filteredHistory.map((item) {
+                  return _buildHistoryTile(
+                    initials: item["initials"],
+                    name: item["name"],
+                    timeOrDesc: item["timeOrDesc"],
+                    amount: "₹${item["amount"]}",
+                    status: item["status"],
+                    isLena: item["isLena"],
+                    onTap: () => _openChat(item),
+                  );
+                }),
             ],
           ),
         ),
