@@ -19,26 +19,29 @@ class HisabChatScreen extends StatefulWidget {
 }
 
 class _HisabChatScreenState extends State<HisabChatScreen> {
-  // OLED Colors from Design
+  // Tailwind Exact Palette from HTML Template
   static const Color oledBg = Color(0xFF000000);
-  static const Color cardSurface = Color(0xFF131315);
-  static const Color cardSurfaceLight = Color(0xFF1E1E22);
-  static const Color greenAccent = Color(0xFF00E676);
-  static const Color redAccent = Color(0xFFFF5252);
-  static const Color textMuted = Color(0xFF888890);
-  static const Color borderSubtle = Color(0x15FFFFFF);
+  static const Color surfaceCard = Color(0xFF141416);
+  static const Color surfaceSecondary = Color(0xFF18181B);
+  static const Color surfaceHighlight = Color(0xFF202024);
+  static const Color borderCustom = Color(0xFF242429);
 
-  // Bottom Input States
+  // Lena / Dena Colors
+  static const Color lenaGreen = Color(0xFF10B981);
+  static const Color lenaGreenLight = Color(0xFF34D399);
+  static const Color denaRed = Color(0xFFF43F5E);
+  static const Color denaRedLight = Color(0xFFFB7185);
+
+  // States
   int _entryType = 0; // 0: Diya, 1: Liya
   String _selectedPaymentMode = "UPI";
   final TextEditingController _amountController = TextEditingController();
   final TextEditingController _noteController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  // Initial Sample Transactions from your design
   final List<Map<String, dynamic>> _messages = [
     {
-      "dateHeader": "28 SEPTEMBER 2024",
+      "dateHeader": "28 September 2024",
       "amount": "50",
       "typeText": "(Diya)",
       "isDiya": true,
@@ -46,17 +49,19 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
       "note": "Chai nashta & patties with friends",
       "time": "28/9 17:42",
       "txnId": null,
+      "isPrimary": false,
       "footerTag": null,
     },
     {
-      "dateHeader": "30 SEPTEMBER 2024",
+      "dateHeader": "30 September 2024",
       "amount": "100",
       "typeText": "(Diya)",
       "isDiya": true,
-      "tag": "CASH",
+      "tag": "Cash",
       "note": "dan kar diya bas aise hi",
       "time": "30/9 21:21",
       "txnId": "#TXN-8941",
+      "isPrimary": true,
       "footerTag": null,
     },
     {
@@ -68,6 +73,7 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
       "note": "Sahil settled partial amount for previous food",
       "time": "Today, 10:15 AM",
       "txnId": null,
+      "isPrimary": false,
       "footerTag": "Balance adjusted",
     },
   ];
@@ -83,7 +89,7 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
   void _addNewEntry() {
     final amountText = _amountController.text.trim();
     if (amountText.isEmpty) {
-      AppToast.show(context, title: "Amount likhein!", type: ToastType.warning);
+      AppToast.show(context, title: "Amount daalein!", type: ToastType.warning);
       return;
     }
 
@@ -103,6 +109,7 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
         "note": noteText,
         "time": "Today, ${TimeOfDay.now().format(context)}",
         "txnId": "#TXN-${DateTime.now().millisecondsSinceEpoch % 10000}",
+        "isPrimary": false,
         "footerTag": _entryType == 1 ? "Balance adjusted" : null,
       });
 
@@ -115,8 +122,8 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent + 80,
-          duration: const Duration(milliseconds: 300),
+          _scrollController.position.maxScrollExtent + 120,
+          duration: const Duration(milliseconds: 260),
           curve: Curves.easeOut,
         );
       }
@@ -124,67 +131,89 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
 
     AppToast.show(
       context,
-      title: "Hisaab save ho gaya!",
+      title: "Entry save ho gayi!",
       type: ToastType.success,
     );
   }
 
+  // Action: Close Page & Navigate Back
+  void _closeChatPage() {
+    FocusScope.of(context).unfocus();
+    Navigator.of(context).pop();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final cleanAmount = widget.netAmount.replaceAll(".00", "");
+
     return Scaffold(
       backgroundColor: oledBg,
       body: SafeArea(
         child: Column(
           children: [
-            // 1. Top Bar (Back Arrow, Friend Name, More Menu)
+            // Top Navigation & Header
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.only(
+                left: 12,
+                right: 14,
+                top: 4,
+                bottom: 2,
+              ),
               child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(
-                      Icons.arrow_back_ios_new_rounded,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                    visualDensity: VisualDensity.compact,
+                  Row(
+                    children: [
+                      GestureDetector(
+                        onTap: _closeChatPage,
+                        behavior: HitTestBehavior.opaque,
+                        child: Container(
+                          padding: const EdgeInsets.all(6),
+                          decoration: const BoxDecoration(
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            color: Color(0xFFA3A3A3),
+                            size: 18,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        widget.friendName,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: 4),
-                  Text(
-                    widget.friendName,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    onPressed: () {},
-                    icon: const Icon(
+                  Container(
+                    width: 32,
+                    height: 32,
+                    alignment: Alignment.center,
+                    child: const Icon(
                       Icons.more_vert_rounded,
-                      color: textMuted,
-                      size: 22,
+                      color: Color(0xFFD4D4D4),
+                      size: 18,
                     ),
                   ),
                 ],
               ),
             ),
 
-            // 2. Net Lena/Dena Floating Card
+            // Net Balance Master Card
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 18,
-                  vertical: 16,
-                ),
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: cardSurface,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: borderSubtle),
+                  color: surfaceCard,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: borderCustom),
                 ),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -195,29 +224,34 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
                         Text(
                           widget.isLena ? "NET LENA HAI" : "NET DENA HAI",
                           style: const TextStyle(
-                            color: textMuted,
+                            color: Color(0xFFA3A3A3),
                             fontSize: 10,
-                            fontWeight: FontWeight.w700,
+                            fontWeight: FontWeight.bold,
                             letterSpacing: 0.8,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Row(
+                          crossAxisAlignment: CrossAxisAlignment.baseline,
+                          textBaseline: TextBaseline.alphabetic,
                           children: [
                             Text(
-                              "₹${widget.netAmount}",
+                              "₹$cleanAmount",
                               style: TextStyle(
-                                color: widget.isLena ? greenAccent : redAccent,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w900,
+                                color: widget.isLena ? lenaGreen : denaRed,
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.3,
                               ),
                             ),
-                            const SizedBox(width: 8),
+                            const SizedBox(width: 6),
                             Text(
                               widget.isLena ? "(Receive)" : "(Pay)",
                               style: TextStyle(
-                                color: widget.isLena ? greenAccent : redAccent,
-                                fontSize: 13,
+                                color: widget.isLena
+                                    ? const Color(0xE634D399)
+                                    : const Color(0xE6FB7185),
+                                fontSize: 12,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -231,9 +265,9 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
                         vertical: 6,
                       ),
                       decoration: BoxDecoration(
-                        color: cardSurfaceLight,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: borderSubtle),
+                        color: surfaceSecondary,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: borderCustom),
                       ),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
@@ -241,16 +275,16 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
                           Text(
                             "Details",
                             style: TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
+                              color: Color(0xFFD4D4D4),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
                           SizedBox(width: 4),
                           Icon(
                             Icons.keyboard_arrow_down_rounded,
-                            color: Colors.white70,
-                            size: 16,
+                            color: Color(0xFFD4D4D4),
+                            size: 14,
                           ),
                         ],
                       ),
@@ -260,228 +294,361 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
               ),
             ),
 
-            // 3. Chat Ledger Statement History
+            // Scrollable Timeline Chat
             Expanded(
               child: ListView.builder(
                 controller: _scrollController,
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+                padding: const EdgeInsets.symmetric(horizontal: 16),
                 itemCount: _messages.length,
                 itemBuilder: (context, index) {
                   final msg = _messages[index];
                   return Column(
                     children: [
-                      // Date Header Capsule (if present)
                       if (msg["dateHeader"] != null)
                         Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 6,
+                              horizontal: 12,
+                              vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFF19191D),
-                              borderRadius: BorderRadius.circular(14),
+                              color: surfaceSecondary.withOpacity(0.8),
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: borderCustom.withOpacity(0.7),
+                              ),
                             ),
                             child: Text(
                               msg["dateHeader"],
                               style: const TextStyle(
-                                color: textMuted,
-                                fontSize: 10.5,
-                                fontWeight: FontWeight.w700,
-                                letterSpacing: 0.8,
+                                color: Color(0xFFA3A3A3),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                letterSpacing: 0.5,
                               ),
                             ),
                           ),
                         ),
-
-                      // Chat Card Bubble
-                      _buildChatBubble(msg),
+                      _buildTransactionCard(msg),
                     ],
                   );
                 },
               ),
             ),
 
-            // 4. Exact Custom Quick-Entry Bottom Navigation Bar
-            _buildCustomChatBottomBar(),
+            // Bottom Action Dock
+            _buildBottomDock(),
           ],
         ),
       ),
     );
   }
 
-  // Individual Statement Card Bubble
-  Widget _buildChatBubble(Map<String, dynamic> msg) {
+  Widget _buildTransactionCard(Map<String, dynamic> msg) {
     final bool isDiya = msg["isDiya"] == true;
-    final Color accent = isDiya ? greenAccent : redAccent;
+    final bool isPrimary = msg["isPrimary"] == true;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: cardSurface,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: isDiya
-              ? greenAccent.withOpacity(0.18)
-              : Colors.white.withOpacity(0.04),
-          width: 1.1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Row 1: Amount + Type & Payment Mode Tag
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    "${isDiya ? '+' : '-'}₹${msg["amount"]}",
-                    style: TextStyle(
-                      color: accent,
-                      fontSize: 17,
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    msg["typeText"],
-                    style: TextStyle(
-                      color: accent,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 3,
-                ),
-                decoration: BoxDecoration(
-                  color: isDiya
-                      ? const Color(0xFF0F2619)
-                      : const Color(0xFF222228),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(
-                    color: isDiya
-                        ? greenAccent.withOpacity(0.2)
-                        : Colors.white10,
-                  ),
-                ),
-                child: Text(
-                  msg["tag"],
-                  style: TextStyle(
-                    color: isDiya ? greenAccent : Colors.white70,
-                    fontSize: 10,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 8),
-
-          // Row 2: Note Description
-          Text(
-            msg["note"],
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-              height: 1.3,
+    if (isPrimary) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.88,
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFF122419), Color(0xFF0F1D14)],
             ),
-          ),
-
-          const SizedBox(height: 10),
-
-          // Row 3: Meta details (Txn ID / Adjusted tag + Time & Checkmark)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              if (msg["txnId"] != null)
-                Text(
-                  msg["txnId"],
-                  style: const TextStyle(
-                    color: textMuted,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w500,
-                  ),
-                )
-              else if (msg["footerTag"] != null)
-                Text(
-                  msg["footerTag"],
-                  style: const TextStyle(
-                    color: greenAccent,
-                    fontSize: 10.5,
-                    fontWeight: FontWeight.w600,
-                  ),
-                )
-              else
-                const SizedBox.shrink(),
-
-              Row(
-                children: [
-                  Text(
-                    msg["time"],
-                    style: const TextStyle(color: textMuted, fontSize: 10.5),
-                  ),
-                  const SizedBox(width: 4),
-                  const Icon(
-                    Icons.done_all_rounded,
-                    size: 14,
-                    color: greenAccent,
-                  ),
-                ],
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(16),
+              bottomLeft: Radius.circular(16),
+              bottomRight: Radius.circular(16),
+              topRight: Radius.circular(4),
+            ),
+            border: Border.all(color: const Color(0x99064E3B)),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x33022C22),
+                blurRadius: 10,
+                offset: Offset(0, 4),
               ),
             ],
           ),
-        ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: const [
+                      Text(
+                        "+₹100",
+                        style: TextStyle(
+                          color: Color(0xFF6EE7B7),
+                          fontSize: 16,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        "(Diya)",
+                        style: TextStyle(
+                          color: Color(0xE66EE7B7),
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: const Color(0xB3022C22),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0x66047857)),
+                    ),
+                    child: const Text(
+                      "Cash",
+                      style: TextStyle(
+                        color: Color(0xFFA7F3D0),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                msg["note"],
+                style: const TextStyle(
+                  color: Color(0xFFECFDF5),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.only(top: 6),
+                decoration: const BoxDecoration(
+                  border: Border(top: BorderSide(color: Color(0x4D065F46))),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      msg["txnId"] ?? "",
+                      style: const TextStyle(
+                        fontFamily: 'monospace',
+                        color: Color(0xB334D399),
+                        fontSize: 10,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Text(
+                          msg["time"],
+                          style: const TextStyle(
+                            color: Color(0xCC6EE7B7),
+                            fontSize: 11,
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        const Icon(
+                          Icons.done_all_rounded,
+                          size: 14,
+                          color: Color(0xFF34D399),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Align(
+      alignment: isDiya ? Alignment.centerRight : Alignment.centerLeft,
+      child: Container(
+        width: MediaQuery.of(context).size.width * 0.85,
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: isDiya ? const Color(0xFF121415) : surfaceCard,
+          borderRadius: BorderRadius.only(
+            topLeft: const Radius.circular(16),
+            bottomLeft: const Radius.circular(16),
+            bottomRight: const Radius.circular(16),
+            topRight: isDiya
+                ? const Radius.circular(4)
+                : const Radius.circular(16),
+          ),
+          border: Border.all(color: borderCustom),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Container(
+              padding: const EdgeInsets.only(bottom: 6),
+              decoration: const BoxDecoration(
+                border: Border(bottom: BorderSide(color: Color(0x0DFFFFFF))),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        "${isDiya ? '+' : '-'}₹${msg["amount"]}",
+                        style: TextStyle(
+                          color: isDiya ? lenaGreenLight : denaRed,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        msg["typeText"],
+                        style: TextStyle(
+                          color: isDiya
+                              ? const Color(0xCC6EE7B7)
+                              : const Color(0xCCFDA4AF),
+                          fontSize: 12,
+                          fontWeight: FontWeight.normal,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: surfaceHighlight,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: borderCustom),
+                    ),
+                    child: Text(
+                      msg["tag"],
+                      style: const TextStyle(
+                        color: Color(0xFFD4D4D4),
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              msg["note"],
+              style: TextStyle(
+                color: isDiya
+                    ? const Color(0xFFE5E5E5)
+                    : const Color(0xFFD4D4D4),
+                fontSize: 12,
+                fontWeight: FontWeight.normal,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                if (msg["footerTag"] != null)
+                  Text(
+                    msg["footerTag"],
+                    style: const TextStyle(color: lenaGreenLight, fontSize: 10),
+                  )
+                else
+                  const SizedBox.shrink(),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      msg["time"],
+                      style: const TextStyle(
+                        color: Color(0xFFD4D4D4),
+                        fontSize: 10,
+                      ),
+                    ),
+                    if (isDiya) ...[
+                      const SizedBox(width: 4),
+                      const Icon(
+                        Icons.done_all_rounded,
+                        size: 12,
+                        color: lenaGreenLight,
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
 
-  // Exact Bottom Bar Layout matching design
-  Widget _buildCustomChatBottomBar() {
+  // Bottom Action Dock with Functional ✕ Button
+  Widget _buildBottomDock() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
-      decoration: const BoxDecoration(color: oledBg),
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      decoration: const BoxDecoration(
+        color: oledBg,
+        border: Border(top: BorderSide(color: borderCustom)),
+      ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Line 1: Note input field & Payment Dropdown Pill
+          // Row 1: Note Input Field
           Container(
-            height: 48,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
+            height: 44,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: cardSurface,
-              borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: borderSubtle),
+              color: surfaceSecondary,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: borderCustom),
             ),
             child: Row(
               children: [
-                const Icon(Icons.notes_rounded, color: textMuted, size: 18),
+                const Icon(
+                  Icons.edit_note_rounded,
+                  color: Color(0xFFA3A3A3),
+                  size: 20,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: TextField(
                     controller: _noteController,
-                    style: const TextStyle(color: Colors.white, fontSize: 12.5),
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
                     decoration: const InputDecoration(
-                      hintText: "Hisaab ka note likhein (e.g. Chai, Udhaar)",
-                      hintStyle: TextStyle(color: textMuted, fontSize: 12),
+                      hintText: "Hisaab ka note likhein (e.g. Chai, Udhaar, Saman)...",
+                      hintStyle: TextStyle(
+                        color: Color(0xFF737373),
+                        fontSize: 12,
+                      ),
                       border: InputBorder.none,
                       isDense: true,
                     ),
                   ),
                 ),
                 PopupMenuButton<String>(
-                  color: cardSurfaceLight,
+                  color: surfaceHighlight,
                   onSelected: (val) =>
                       setState(() => _selectedPaymentMode = val),
                   itemBuilder: (ctx) => [
@@ -497,9 +664,9 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
                       ),
                     ),
                     const PopupMenuItem(
-                      value: "CASH",
+                      value: "Cash",
                       child: Text(
-                        "CASH",
+                        "Cash",
                         style: TextStyle(color: Colors.white),
                       ),
                     ),
@@ -513,35 +680,36 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
                   ],
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 5,
+                      horizontal: 10,
+                      vertical: 4,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF1E2125),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.white10),
+                      color: surfaceHighlight,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: borderCustom),
                     ),
                     child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         const Icon(
                           Icons.account_balance_wallet_outlined,
-                          size: 13,
-                          color: greenAccent,
+                          size: 14,
+                          color: lenaGreenLight,
                         ),
-                        const SizedBox(width: 5),
+                        const SizedBox(width: 4),
                         Text(
                           _selectedPaymentMode,
                           style: const TextStyle(
-                            color: Colors.white,
+                            color: Color(0xFFE5E5E5),
                             fontSize: 11,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w500,
                           ),
                         ),
                         const SizedBox(width: 2),
                         const Icon(
-                          Icons.keyboard_arrow_up_rounded,
+                          Icons.expand_less_rounded,
                           size: 14,
-                          color: textMuted,
+                          color: Color(0xFFA3A3A3),
                         ),
                       ],
                     ),
@@ -553,29 +721,28 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
 
           const SizedBox(height: 10),
 
-          // Line 2: Diya / Liya Toggle Pills
+          // Row 2: Diya / Liya Toggle
           Container(
-            height: 48,
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: cardSurface,
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: borderSubtle),
+              color: surfaceSecondary.withOpacity(0.9),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: borderCustom),
             ),
             child: Row(
               children: [
                 Expanded(
                   child: GestureDetector(
                     onTap: () => setState(() => _entryType = 0),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 9),
                       decoration: BoxDecoration(
                         color: _entryType == 0
-                            ? const Color(0xFF0F2B1D)
+                            ? const Color(0xB3022C22)
                             : Colors.transparent,
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(12),
                         border: _entryType == 0
-                            ? Border.all(color: greenAccent.withOpacity(0.3))
+                            ? Border.all(color: const Color(0x66047857))
                             : null,
                       ),
                       child: Row(
@@ -584,15 +751,19 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
                           Icon(
                             Icons.arrow_upward_rounded,
                             size: 16,
-                            color: _entryType == 0 ? greenAccent : textMuted,
+                            color: _entryType == 0
+                                ? const Color(0xFF6EE7B7)
+                                : const Color(0xFFA3A3A3),
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 5),
                           Text(
                             "Diya",
                             style: TextStyle(
-                              color: _entryType == 0 ? greenAccent : textMuted,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
+                              color: _entryType == 0
+                                  ? const Color(0xFF6EE7B7)
+                                  : const Color(0xFFA3A3A3),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
@@ -603,15 +774,15 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
                 Expanded(
                   child: GestureDetector(
                     onTap: () => setState(() => _entryType = 1),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 150),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 9),
                       decoration: BoxDecoration(
                         color: _entryType == 1
-                            ? const Color(0xFF2E1316)
+                            ? const Color(0xB34C0519)
                             : Colors.transparent,
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(12),
                         border: _entryType == 1
-                            ? Border.all(color: redAccent.withOpacity(0.3))
+                            ? Border.all(color: const Color(0x66BE123C))
                             : null,
                       ),
                       child: Row(
@@ -620,15 +791,19 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
                           Icon(
                             Icons.arrow_downward_rounded,
                             size: 16,
-                            color: _entryType == 1 ? redAccent : textMuted,
+                            color: _entryType == 1
+                                ? const Color(0xFFFDA4AF)
+                                : const Color(0xFFA3A3A3),
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 5),
                           Text(
                             "Liya",
                             style: TextStyle(
-                              color: _entryType == 1 ? redAccent : textMuted,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
+                              color: _entryType == 1
+                                  ? const Color(0xFFFDA4AF)
+                                  : const Color(0xFFA3A3A3),
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
                             ),
                           ),
                         ],
@@ -642,30 +817,29 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
 
           const SizedBox(height: 10),
 
-          // Line 3: Amount Field, White Save Pill, and Dark Close Button
+          // Row 3: Amount + Save + Close Button (Closes Page)
           Row(
             children: [
-              // Amount Input Pill
               Expanded(
                 child: Container(
-                  height: 52,
+                  height: 48,
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   decoration: BoxDecoration(
-                    color: cardSurface,
-                    borderRadius: BorderRadius.circular(26),
-                    border: Border.all(color: borderSubtle),
+                    color: surfaceSecondary,
+                    borderRadius: BorderRadius.circular(24),
+                    border: Border.all(color: borderCustom),
                   ),
                   child: Row(
                     children: [
                       const Text(
                         "₹",
                         style: TextStyle(
-                          color: greenAccent,
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
+                          color: lenaGreenLight,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       Expanded(
                         child: TextField(
                           controller: _amountController,
@@ -673,12 +847,12 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14,
-                            fontWeight: FontWeight.bold,
+                            fontWeight: FontWeight.w600,
                           ),
                           decoration: const InputDecoration(
                             hintText: "Amount",
                             hintStyle: TextStyle(
-                              color: textMuted,
+                              color: Color(0xFF737373),
                               fontSize: 13,
                             ),
                             border: InputBorder.none,
@@ -693,15 +867,22 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
 
               const SizedBox(width: 10),
 
-              // Save Button (Pure White Pill)
+              // Save Button
               GestureDetector(
                 onTap: _addNewEntry,
                 child: Container(
-                  height: 52,
-                  padding: const EdgeInsets.symmetric(horizontal: 22),
+                  height: 48,
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
                   decoration: BoxDecoration(
                     color: Colors.white,
-                    borderRadius: BorderRadius.circular(26),
+                    borderRadius: BorderRadius.circular(24),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black26,
+                        blurRadius: 10,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
@@ -710,12 +891,13 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
                         "Save",
                         style: TextStyle(
                           color: Colors.black,
-                          fontSize: 13.5,
-                          fontWeight: FontWeight.w900,
+                          fontSize: 13,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
                         ),
                       ),
-                      SizedBox(width: 5),
-                      Icon(Icons.check_rounded, color: Colors.black, size: 18),
+                      SizedBox(width: 4),
+                      Icon(Icons.check_rounded, color: Colors.black, size: 16),
                     ],
                   ),
                 ),
@@ -723,31 +905,39 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
 
               const SizedBox(width: 10),
 
-              // Close Button (Circular Dark)
+              // ✕ Close Button (Directly Closes Chat Screen)
               GestureDetector(
-                onTap: () {
-                  _amountController.clear();
-                  _noteController.clear();
-                  FocusScope.of(context).unfocus();
-                },
+                onTap: _closeChatPage,
                 child: Container(
-                  height: 52,
-                  width: 52,
+                  height: 48,
+                  width: 48,
                   decoration: BoxDecoration(
-                    color: cardSurface,
+                    color: surfaceSecondary,
                     shape: BoxShape.circle,
-                    border: Border.all(color: borderSubtle),
+                    border: Border.all(color: borderCustom),
                   ),
                   child: const Center(
                     child: Icon(
                       Icons.close_rounded,
-                      color: Colors.white70,
+                      color: Color(0xFFD4D4D4),
                       size: 20,
                     ),
                   ),
                 ),
               ),
             ],
+          ),
+
+          const SizedBox(height: 12),
+
+          // Home Drag Bar
+          Container(
+            width: 128,
+            height: 4,
+            decoration: BoxDecoration(
+              color: const Color(0x6652525B),
+              borderRadius: BorderRadius.circular(2),
+            ),
           ),
         ],
       ),
