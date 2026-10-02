@@ -12,10 +12,10 @@ class DostKhataScreen extends StatefulWidget {
 }
 
 class _DostKhataScreenState extends State<DostKhataScreen> {
-  String _activeFilter = "Sabhi"; // Sabhi, Lena Hai, Dena Hai
+  String _activeFilter = "Sabhi"; // Sabhi, Lena Hai, Dena Hai, ya Dynamic Tag
   String _searchQuery = "";
 
-  // OLED Luxury Dark Palette
+  // OLED Luxury Dark Palette (Exact from your file)
   static const Color oledBg = Color(0xFF000000);
   static const Color cardSurface = Color(0xFF131315);
   static const Color cardSurfaceLight = Color(0xFF1C1C1F);
@@ -26,12 +26,21 @@ class _DostKhataScreenState extends State<DostKhataScreen> {
   static const Color textMuted = Color(0xFF888890);
   static const Color textMutedDark = Color(0xFF55555C);
 
-  // Sample data according to design reference
+  // Available tags for automatic detection
+  static const List<String> availableTags = [
+    'College',
+    'Roommate',
+    'Office',
+    'Business',
+    'Personal',
+  ];
+
+  // Sample data according to your design reference
   final List<Map<String, dynamic>> _dostList = [
     {
       "initials": "SK",
       "name": "Sahil",
-      "desc": "dan kar diya bas aise hi",
+      "desc": "dan kar diya bas aise hi • Roommate",
       "time": "Aaj",
       "amount": "100.00",
       "status": "+₹100 lena",
@@ -40,7 +49,7 @@ class _DostKhataScreenState extends State<DostKhataScreen> {
     {
       "initials": "MS",
       "name": "Mahaveer Shinha",
-      "desc": "selun bal katai",
+      "desc": "selun bal katai • College",
       "time": "Aaj",
       "amount": "150.00",
       "status": "+₹150 lena",
@@ -49,7 +58,7 @@ class _DostKhataScreenState extends State<DostKhataScreen> {
     {
       "initials": "RN",
       "name": "Ranu",
-      "desc": "patni davai ilaj",
+      "desc": "patni davai ilaj • Personal",
       "time": "Kal",
       "amount": "50.00",
       "status": "+₹50 lena",
@@ -58,7 +67,7 @@ class _DostKhataScreenState extends State<DostKhataScreen> {
     {
       "initials": "JN",
       "name": "Janu",
-      "desc": "dhandhe ka hisaab",
+      "desc": "dhandhe ka hisaab • Business",
       "time": "28 Oct",
       "amount": "150.00",
       "status": "-₹150 dena",
@@ -81,6 +90,52 @@ class _DostKhataScreenState extends State<DostKhataScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Dynamic Filter Chips List Generation (Sabhi, Lena Hai, Dena Hai + Auto Detected Tags)
+    final int lenaCount = _dostList.where((d) => d["isLena"] == true).length;
+    final int denaCount = _dostList.where((d) => d["isLena"] == false).length;
+
+    final List<Map<String, dynamic>> filterChips = [
+      {
+        "id": "Sabhi",
+        "label": "Sabhi",
+        "count": _dostList.length,
+        "color": null,
+        "isTag": false,
+      },
+      {
+        "id": "Lena Hai",
+        "label": "Lena Hai",
+        "count": lenaCount,
+        "color": greenAccent,
+        "isTag": false,
+      },
+      {
+        "id": "Dena Hai",
+        "label": "Dena Hai",
+        "count": denaCount,
+        "color": redAccent,
+        "isTag": false,
+      },
+    ];
+
+    for (var tag in availableTags) {
+      final count = _dostList
+          .where(
+            (d) =>
+                d["desc"].toString().toLowerCase().contains(tag.toLowerCase()),
+          )
+          .length;
+      if (count > 0) {
+        filterChips.add({
+          "id": tag,
+          "label": tag,
+          "count": count,
+          "color": const Color(0xFF38BDF8),
+          "isTag": true,
+        });
+      }
+    }
+
     final filteredList = _dostList.where((dost) {
       final nameMatches =
           dost["name"].toString().toLowerCase().contains(
@@ -93,11 +148,16 @@ class _DostKhataScreenState extends State<DostKhataScreen> {
 
       if (_activeFilter == "Lena Hai") return dost["isLena"] == true;
       if (_activeFilter == "Dena Hai") return dost["isLena"] == false;
+
+      // Tag filter check
+      if (_activeFilter != "Sabhi") {
+        return dost["desc"].toString().toLowerCase().contains(
+          _activeFilter.toLowerCase(),
+        );
+      }
+
       return true;
     }).toList();
-
-    final int lenaCount = _dostList.where((d) => d["isLena"] == true).length;
-    final int denaCount = _dostList.where((d) => d["isLena"] == false).length;
 
     return Scaffold(
       backgroundColor: oledBg,
@@ -108,7 +168,7 @@ class _DostKhataScreenState extends State<DostKhataScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. Signature Top Bar
+              // 1. Signature Top Bar (Exact Match)
               Padding(
                 padding: const EdgeInsets.only(top: 4, bottom: 6),
                 child: Row(
@@ -205,7 +265,7 @@ class _DostKhataScreenState extends State<DostKhataScreen> {
 
               const SizedBox(height: 18),
 
-              // 2. Net Ledger Ring Card
+              // 2. Net Ledger Ring Card (Exact Match with + Naya Khata Button)
               Container(
                 padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
                 decoration: BoxDecoration(
@@ -384,7 +444,7 @@ class _DostKhataScreenState extends State<DostKhataScreen> {
 
                     const SizedBox(height: 22),
 
-                    // Count Pill & + Naya Khata Row
+                    // Count Pill & + Naya Khata Row (Preserved Exact)
                     Row(
                       children: [
                         Container(
@@ -453,20 +513,29 @@ class _DostKhataScreenState extends State<DostKhataScreen> {
 
               const SizedBox(height: 18),
 
-              // 3. Category Filter Chips
-              Row(
-                children: [
-                  _buildFilterChip("Sabhi", _dostList.length, null),
-                  const SizedBox(width: 8),
-                  _buildFilterChip("Lena Hai", lenaCount, greenAccent),
-                  const SizedBox(width: 8),
-                  _buildFilterChip("Dena Hai", denaCount, redAccent),
-                ],
+              // 3. Category Filter Chips (Horizontal Scrollable with Dynamic Tag Filters)
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                physics: const BouncingScrollPhysics(),
+                child: Row(
+                  children: filterChips.map((chip) {
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: _buildFilterChip(
+                        id: chip["id"] as String,
+                        label: chip["label"] as String,
+                        count: chip["count"] as int,
+                        dotColor: chip["color"] as Color?,
+                        isTag: chip["isTag"] as bool,
+                      ),
+                    );
+                  }).toList(),
+                ),
               ),
 
               const SizedBox(height: 24),
 
-              // 4. Section Title
+              // 4. Section Title (Exact Match)
               const Text(
                 "Active Dost",
                 style: TextStyle(
@@ -478,7 +547,7 @@ class _DostKhataScreenState extends State<DostKhataScreen> {
 
               const SizedBox(height: 12),
 
-              // 5. Active Dost Ledger List
+              // 5. Active Dost Ledger List (Exact Match)
               if (filteredList.isEmpty)
                 const Padding(
                   padding: EdgeInsets.symmetric(vertical: 40),
@@ -509,24 +578,43 @@ class _DostKhataScreenState extends State<DostKhataScreen> {
     );
   }
 
-  Widget _buildFilterChip(String label, int count, Color? dotColor) {
-    final bool isSelected = _activeFilter == label;
+  Widget _buildFilterChip({
+    required String id,
+    required String label,
+    required int count,
+    required Color? dotColor,
+    required bool isTag,
+  }) {
+    final bool isSelected = _activeFilter == id;
     return GestureDetector(
-      onTap: () => setState(() => _activeFilter = label),
+      onTap: () => setState(() => _activeFilter = id),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
         decoration: BoxDecoration(
-          color: isSelected ? const Color(0xFF222228) : cardSurface,
+          color: isSelected
+              ? (isTag ? const Color(0xFF0369A1) : const Color(0xFF222228))
+              : (isTag ? const Color(0xFF0C1929) : cardSurface),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: isSelected ? Colors.white24 : Colors.white.withOpacity(0.04),
+            color: isSelected
+                ? (isTag ? const Color(0xFF38BDF8) : Colors.white24)
+                : (isTag
+                      ? const Color(0xFF0284C7).withOpacity(0.4)
+                      : Colors.white.withOpacity(0.04)),
           ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (dotColor != null) ...[
+            if (isTag) ...[
+              Icon(
+                Icons.tag_rounded,
+                size: 12,
+                color: isSelected ? Colors.white : const Color(0xFF38BDF8),
+              ),
+              const SizedBox(width: 4),
+            ] else if (dotColor != null) ...[
               Container(
                 width: 6,
                 height: 6,
@@ -550,7 +638,9 @@ class _DostKhataScreenState extends State<DostKhataScreen> {
             Text(
               label,
               style: TextStyle(
-                color: isSelected ? Colors.white : textMuted,
+                color: isSelected
+                    ? Colors.white
+                    : (isTag ? const Color(0xFF38BDF8) : textMuted),
                 fontSize: 11.5,
                 fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
               ),
@@ -668,7 +758,7 @@ class _DostKhataScreenState extends State<DostKhataScreen> {
   }
 }
 
-// HD Retina Dual-Arc Painter
+// HD Retina Dual-Arc Painter (Exact Match)
 class _NetRadialChartPainter extends CustomPainter {
   final double greenFraction;
   final double redFraction;

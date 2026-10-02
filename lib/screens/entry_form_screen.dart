@@ -9,7 +9,7 @@ import '../widgets/custom_toast.dart';
 import '../widgets/entry_form_widgets.dart';
 
 class EntryFormView extends StatefulWidget {
-  final int entryType; // 0: Kharcha, 1: Diya, 2: Liya
+  final int entryType;
   final VoidCallback onClose;
 
   const EntryFormView({
@@ -27,10 +27,8 @@ class _EntryFormViewState extends State<EntryFormView> {
   late Box<TransactionModel> _transBox;
   late HisaabEntryService _entryService;
 
-  // State Model
   late EntryFormStateData _stateData;
 
-  // Controllers
   final TextEditingController _searchCtrl = TextEditingController();
   final TextEditingController _noteCtrl = TextEditingController();
   final TextEditingController _amountCtrl = TextEditingController();
@@ -253,13 +251,53 @@ class _EntryFormViewState extends State<EntryFormView> {
                 .where((f) => f.type == 'dena' && f.balance > 0)
                 .length;
 
+            // -------------------------------------------------------------
+            // DYNAMIC TAGS DETECTION & FILTER LIST CREATION
+            // -------------------------------------------------------------
+            final List<FilterItem> filterItems = [
+              FilterItem(
+                id: 'all',
+                label: 'Sabhi',
+                count: totalCount,
+                type: 'all',
+              ),
+              FilterItem(
+                id: 'lena',
+                label: 'Lena Hai',
+                count: lenaCount,
+                type: 'lena',
+              ),
+              FilterItem(
+                id: 'dena',
+                label: 'Dena Hai',
+                count: denaCount,
+                type: 'dena',
+              ),
+            ];
+
+            // Sabhi available tags me se check karo kis kis tag ke dost box me maujood hain
+            for (var tag in EntryFormStateData.availableTags) {
+              final count = allFriends
+                  .where(
+                    (f) => f.desc.toLowerCase().contains(tag.toLowerCase()),
+                  )
+                  .length;
+              if (count > 0) {
+                filterItems.add(
+                  FilterItem(id: tag, label: tag, count: count, type: 'tag'),
+                );
+              }
+            }
+
             final query = _searchCtrl.text.trim().toLowerCase();
 
+            // Filtered entries list logic
             final List<MapEntry<dynamic, FriendModel>> filteredEntries = [];
             for (int i = 0; i < allFriends.length; i++) {
               final friend = allFriends[i];
               final key = allKeys[i];
 
+              // Base Filters
               if (_stateData.activeFilter == 'lena' &&
                   (friend.type != 'lena' || friend.balance <= 0))
                 continue;
@@ -267,6 +305,18 @@ class _EntryFormViewState extends State<EntryFormView> {
                   (friend.type != 'dena' || friend.balance <= 0))
                 continue;
 
+              // Dynamic Tag Filter Check
+              if (_stateData.activeFilter != 'all' &&
+                  _stateData.activeFilter != 'lena' &&
+                  _stateData.activeFilter != 'dena') {
+                if (!friend.desc.toLowerCase().contains(
+                  _stateData.activeFilter.toLowerCase(),
+                )) {
+                  continue;
+                }
+              }
+
+              // Search Query Match
               if (query.isNotEmpty) {
                 final matchName = friend.name.toLowerCase().contains(query);
                 final matchDesc = friend.desc.toLowerCase().contains(query);
@@ -305,9 +355,7 @@ class _EntryFormViewState extends State<EntryFormView> {
                 EntrySearchBarAndFilters(
                   searchCtrl: _searchCtrl,
                   activeFilter: _stateData.activeFilter,
-                  totalCount: totalCount,
-                  lenaCount: lenaCount,
-                  denaCount: denaCount,
+                  filterList: filterItems, // Dynamic List with Auto Tags
                   onFilterChanged: (filter) =>
                       setState(() => _stateData.activeFilter = filter),
                   onSearchChanged: () => setState(() {}),

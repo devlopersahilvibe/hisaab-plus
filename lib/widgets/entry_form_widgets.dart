@@ -87,14 +87,26 @@ class EntryTopNavHeader extends StatelessWidget {
 }
 
 // -------------------------------------------------------------
-// 2. SEARCH & FILTER PILLS BAR
+// 2. SEARCH & DYNAMIC FILTER PILLS BAR
 // -------------------------------------------------------------
+class FilterItem {
+  final String id; // 'all', 'lena', 'dena', ya tag name jaise 'Roommate'
+  final String label; // "Sabhi", "Lena Hai", "Office"
+  final int count;
+  final String type; // 'all', 'lena', 'dena', 'tag'
+
+  FilterItem({
+    required this.id,
+    required this.label,
+    required this.count,
+    required this.type,
+  });
+}
+
 class EntrySearchBarAndFilters extends StatelessWidget {
   final TextEditingController searchCtrl;
   final String activeFilter;
-  final int totalCount;
-  final int lenaCount;
-  final int denaCount;
+  final List<FilterItem> filterList;
   final ValueChanged<String> onFilterChanged;
   final VoidCallback onSearchChanged;
 
@@ -102,41 +114,59 @@ class EntrySearchBarAndFilters extends StatelessWidget {
     super.key,
     required this.searchCtrl,
     required this.activeFilter,
-    required this.totalCount,
-    required this.lenaCount,
-    required this.denaCount,
+    required this.filterList,
     required this.onFilterChanged,
     required this.onSearchChanged,
   });
 
-  Widget _buildFilterPill(String filterType, String label) {
-    final isSelected = activeFilter == filterType;
+  Widget _buildFilterPill(FilterItem item) {
+    final isSelected = activeFilter == item.id;
     Color textColor = neutral400;
 
     if (isSelected) {
       textColor = Colors.black;
-    } else if (filterType == 'lena') {
+    } else if (item.type == 'lena') {
       textColor = lenaGreen;
-    } else if (filterType == 'dena') {
+    } else if (item.type == 'dena') {
       textColor = const Color(0xFFFB7185);
+    } else if (item.type == 'tag') {
+      textColor = const Color(0xFF38BDF8); // Subtle Cyan for tags
     }
 
     return GestureDetector(
-      onTap: () => onFilterChanged(filterType),
+      onTap: () => onFilterChanged(item.id),
       child: Container(
+        margin: const EdgeInsets.only(right: 8),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          color: isSelected ? Colors.white : surfaceSec,
+          color: isSelected
+              ? Colors.white
+              : (item.type == 'tag' ? const Color(0xFF0C1929) : surfaceSec),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: isSelected ? Colors.white : borderCustom),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: textColor,
-            fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-            fontSize: 11,
+          border: Border.all(
+            color: isSelected
+                ? Colors.white
+                : (item.type == 'tag'
+                      ? const Color(0xFF0284C7).withOpacity(0.4)
+                      : borderCustom),
           ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (item.type == 'tag' && !isSelected) ...[
+              const Icon(Icons.tag_rounded, size: 12, color: Color(0xFF38BDF8)),
+              const SizedBox(width: 3),
+            ],
+            Text(
+              "${item.label} (${item.count})",
+              style: TextStyle(
+                color: textColor,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                fontSize: 11,
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -202,13 +232,9 @@ class EntrySearchBarAndFilters extends StatelessWidget {
             scrollDirection: Axis.horizontal,
             physics: const BouncingScrollPhysics(),
             child: Row(
-              children: [
-                _buildFilterPill("all", "Sabhi ($totalCount)"),
-                const SizedBox(width: 8),
-                _buildFilterPill("lena", "Lena Hai ($lenaCount)"),
-                const SizedBox(width: 8),
-                _buildFilterPill("dena", "Dena Hai ($denaCount)"),
-              ],
+              children: filterList
+                  .map((item) => _buildFilterPill(item))
+                  .toList(),
             ),
           ),
         ],
