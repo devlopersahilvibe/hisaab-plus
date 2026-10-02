@@ -1,25 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
+
+import 'models/transaction_model.dart';
+import 'models/friend_model.dart';
 import 'screens/home_screen.dart';
 import 'screens/khata_screen.dart';
 import 'screens/entry_form_screen.dart';
 import 'widgets/bottom_nav_bar.dart';
-// import 'package:flutter/services.dart';
-import 'package:hive_flutter/hive_flutter.dart';       // <-- 1. Naya Hive import
-import 'models/transaction_model.dart';                // <-- 2. Transaction model
-import 'models/friend_model.dart';                     // <-- 3. Friend model
-import 'screens/splash_screen.dart';
 
-void main() async {                                    
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // 1. Hive ko phone mein start karein
   await Hive.initFlutter();
 
-  // 2. Adapters register karein taaki Hive classes ko pehchaane
+  // Adapters registration
   Hive.registerAdapter(TransactionModelAdapter());
   Hive.registerAdapter(FriendModelAdapter());
 
-  // 3. Database memory boxes kholen
   await Hive.openBox<TransactionModel>('transactions_box');
   await Hive.openBox<FriendModel>('friends_box');
 
@@ -33,13 +29,11 @@ class HisaabApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'HISAAB+',
-      theme: ThemeData(
-        fontFamily: 'sans-serif',
-        scaffoldBackgroundColor: const Color(0xFFF9F5F0),
+      title: 'HISAAB+ v4.0.0',
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: const Color(0xFF000000), // OLED Pitch Black
       ),
-      // Splash screen yahan se shuru hogi:
-      home: const SplashScreen(),
+      home: const MainNavigationScreen(),
     );
   }
 }
@@ -52,60 +46,47 @@ class MainNavigationScreen extends StatefulWidget {
 }
 
 class _MainNavigationScreenState extends State<MainNavigationScreen> {
-  int _activeTab = 0; // 0: Home, 1: Dost Khata, 2: Entry Form View
-  int _selectedEntryType = 0; // 0: Kharcha, 1: Diya, 2: Liya
-  bool _isExpanded = false;
+  int _activeTab = 0; // 0: Home, 1: Khata, 2: Profile
 
-  void _switchToAddEntry(int entryType) {
-    setState(() {
-      _selectedEntryType = entryType;
-      _activeTab = 2;
-      _isExpanded = false;
-    });
+  void _openQuickEntry() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) =>
+            EntryFormView(entryType: 0, onClose: () => Navigator.pop(context)),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      resizeToAvoidBottomInset: true,
+      backgroundColor: const Color(0xFF000000),
+      resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          // Screens Stack
+          // Screens Switcher (Fixed recursion bug)
           IndexedStack(
             index: _activeTab,
-            children: [
-              const HomeScreen(),
-              const DostKhataScreen(),
-              EntryFormView(
-                entryType: _selectedEntryType,
-                onClose: () => setState(() => _activeTab = 0),
+            children: const [
+              HomeScreen(),
+              DostKhataScreen(), // Yahan sahi screen attach kar di gayi hai
+              Center(
+                child: Text(
+                  "Profile Screen (Coming Soon)",
+                  style: TextStyle(color: Colors.white70, fontSize: 16),
+                ),
               ),
             ],
           ),
 
-          // Dim background overlay on nav expand
-          if (_isExpanded)
-            GestureDetector(
-              onTap: () => setState(() => _isExpanded = false),
-              child: Container(color: Colors.black.withValues(alpha: 0.2)),
-            ),
-
-          // Reusable Floating Bottom Bar Widget
-          FloatingBottomNavBar(
+          // OLED Luxury Floating Navigation Bar
+          FloatingOledNavBar(
             activeTab: _activeTab,
-            isExpanded: _isExpanded,
             onTabSelected: (index) {
-              setState(() {
-                _activeTab = index;
-                _isExpanded = false;
-              });
+              setState(() => _activeTab = index);
             },
-            onToggleExpand: () {
-              setState(() {
-                _isExpanded = !_isExpanded;
-              });
-            },
-            onAddEntry: _switchToAddEntry,
+            onAddPressed: _openQuickEntry,
           ),
         ],
       ),

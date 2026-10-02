@@ -1,128 +1,147 @@
 import 'package:flutter/material.dart';
 
-
-class FloatingBottomNavBar extends StatelessWidget {
+class FloatingOledNavBar extends StatefulWidget {
   final int activeTab;
-  final bool isExpanded;
   final Function(int) onTabSelected;
-  final VoidCallback onToggleExpand;
-  final Function(int) onAddEntry;
+  final VoidCallback onAddPressed;
 
-  const FloatingBottomNavBar({
+  const FloatingOledNavBar({
     super.key,
     required this.activeTab,
-    required this.isExpanded,
     required this.onTabSelected,
-    required this.onToggleExpand,
-    required this.onAddEntry,
+    required this.onAddPressed,
   });
 
   @override
-  Widget build(BuildContext context) {
-    const primaryColor = Color(0xFF9E3626);
-    const textDark = Color(0xFF1E1E1E);
+  State<FloatingOledNavBar> createState() => _FloatingOledNavBarState();
+}
 
-    return Align(
-      alignment: Alignment.bottomCenter,
-      child: Padding(
-        padding: const EdgeInsets.only(bottom: 16),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOutBack,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(isExpanded ? 24 : 35),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.12),
-                blurRadius: 18,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Column(
+class _FloatingOledNavBarState extends State<FloatingOledNavBar>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _rotationAnimation;
+
+  static const Color navBg = Color(0xFF141416);
+  static const Color activeChipBg = Color(0xFF232328);
+  static const Color textMuted = Color(0xFF888890);
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
+
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 0.88).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeInOut),
+    );
+
+    _rotationAnimation = Tween<double>(begin: 0.0, end: 0.125).animate(
+      CurvedAnimation(parent: _animController, curve: Curves.easeOutBack),
+    );
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  void _handlePlusTap() async {
+    await _animController.forward();
+    await _animController.reverse();
+    widget.onAddPressed();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned(
+      left: 16,
+      right: 16,
+      bottom: 16,
+      child: Center(
+        child: ConstrainedBox(
+          // Width ko thoda broad aur proportional banaya
+          constraints: const BoxConstraints(maxWidth: 345),
+          child: Row(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Expanded Action Pills (Kharcha, Diya, Liya)
-              AnimatedCrossFade(
-                duration: const Duration(milliseconds: 200),
-                crossFadeState: isExpanded
-                    ? CrossFadeState.showSecond
-                    : CrossFadeState.showFirst,
-                firstChild: const SizedBox.shrink(),
-                secondChild: Padding(
-                  padding: const EdgeInsets.only(bottom: 8, top: 2),
+              // 1. Sleek Comfortable Capsule Navigation (Home, Khata, Profile)
+              Expanded(
+                child: Container(
+                  height: 60, // Squeezed feel khatam karne ke liye 60px height
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: navBg,
+                    borderRadius: BorderRadius.circular(34),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.06),
+                      width: 1,
+                    ),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Colors.black87,
+                        blurRadius: 18,
+                        offset: Offset(0, 6),
+                      ),
+                    ],
+                  ),
                   child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
                     children: [
-                      _buildPillButton(
-                        icon: Icons.receipt_long_rounded,
-                        label: "Kharcha",
-                        color: const Color(0xFF37474F),
-                        onTap: () => onAddEntry(0),
-                      ),
-                      const SizedBox(width: 6),
-                      _buildPillButton(
-                        icon: Icons.arrow_upward_rounded,
-                        label: "Diya (+)",
-                        color: const Color(0xFF2E7D32),
-                        onTap: () => onAddEntry(1),
-                      ),
-                      const SizedBox(width: 6),
-                      _buildPillButton(
-                        icon: Icons.arrow_downward_rounded,
-                        label: "Liya (-)",
-                        color: const Color(0xFFC62828),
-                        onTap: () => onAddEntry(2),
-                      ),
+                      _buildNavItem(0, Icons.home_rounded, "Home"),
+                      _buildNavItem(1, Icons.menu_book_rounded, "Khata"),
+                      _buildNavItem(2, Icons.person_rounded, "Profile"),
                     ],
                   ),
                 ),
               ),
 
-              // Base Navigation Icons (Home & Khata)
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildNavIcon(
-                    icon: activeTab == 0 ? Icons.home_rounded : Icons.home_outlined,
-                    label: "Home",
-                    isActive: activeTab == 0,
-                    onTap: () => onTabSelected(0),
-                  ),
-                  const SizedBox(width: 14),
-                  GestureDetector(
-                    onTap: onToggleExpand,
-                    child: AnimatedRotation(
-                      turns: isExpanded ? 0.125 : 0.0,
-                      duration: const Duration(milliseconds: 200),
+              const SizedBox(width: 12),
+
+              // 2. Proportional Animated White Floating '+' Button
+              GestureDetector(
+                onTap: _handlePlusTap,
+                behavior: HitTestBehavior.opaque,
+                child: AnimatedBuilder(
+                  animation: _animController,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: _scaleAnimation.value,
                       child: Container(
-                        height: 44,
-                        width: 44,
-                        decoration: BoxDecoration(
-                          color: isExpanded ? textDark : primaryColor,
+                        height: 58,
+                        width: 58,
+                        decoration: const BoxDecoration(
+                          color: Colors.white,
                           shape: BoxShape.circle,
                           boxShadow: [
                             BoxShadow(
-                              color: (isExpanded ? textDark : primaryColor).withValues(alpha: 0.35),
-                              blurRadius: 8,
-                              offset: const Offset(0, 3),
+                              color: Colors.black54,
+                              blurRadius: 14,
+                              offset: Offset(0, 5),
                             ),
                           ],
                         ),
-                        child: const Icon(Icons.add_rounded, color: Colors.white, size: 26),
+                        child: Center(
+                          child: RotationTransition(
+                            turns: _rotationAnimation,
+                            child: const Icon(
+                              Icons.add_rounded,
+                              color: Colors.black,
+                              size: 30,
+                            ),
+                          ),
+                        ),
                       ),
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  _buildNavIcon(
-                    icon: activeTab == 1 ? Icons.people_alt_rounded : Icons.people_outline_rounded,
-                    label: "Khata",
-                    isActive: activeTab == 1,
-                    onTap: () => onTabSelected(1),
-                  ),
-                ],
+                    );
+                  },
+                ),
               ),
             ],
           ),
@@ -131,59 +150,36 @@ class FloatingBottomNavBar extends StatelessWidget {
     );
   }
 
-  Widget _buildNavIcon({
-    required IconData icon,
-    required String label,
-    required bool isActive,
-    required VoidCallback onTap,
-  }) {
-    const primaryColor = Color(0xFF9E3626);
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+  Widget _buildNavItem(int index, IconData icon, String label) {
+    final bool isSelected = widget.activeTab == index;
+
+    return GestureDetector(
+      onTap: () => widget.onTabSelected(index),
+      behavior: HitTestBehavior.opaque,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
+        curve: Curves.easeInOut,
+        // Active pill ko bada aur prominent banaya gaya hai
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 7),
+        decoration: BoxDecoration(
+          color: isSelected ? activeChipBg : Colors.transparent,
+          borderRadius: BorderRadius.circular(24),
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(icon, color: isActive ? primaryColor : Colors.grey, size: 22),
-            const SizedBox(height: 2),
+            Icon(icon, size: 20, color: isSelected ? Colors.white : textMuted),
+            const SizedBox(height: 3),
             Text(
               label,
               style: TextStyle(
                 fontSize: 10,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                color: isActive ? primaryColor : Colors.grey,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                color: isSelected ? Colors.white : textMuted,
+                height: 1.1,
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPillButton({
-    required IconData icon,
-    required String label,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: color.withValues(alpha: 0.25), width: 1),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, size: 14, color: color),
-            const SizedBox(width: 4),
-            Text(label, style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: color)),
           ],
         ),
       ),

@@ -1,8 +1,8 @@
-import 'dart:async';
+import 'dart:math';
+
 import 'package:flutter/material.dart';
-import 'package:hive_flutter/hive_flutter.dart';
-import '../models/friend_model.dart';
-import '../widgets/custom_toast.dart';
+
+import 'hisab_chat.dart';
 
 class DostKhataScreen extends StatefulWidget {
   const DostKhataScreen({super.key});
@@ -12,929 +12,556 @@ class DostKhataScreen extends StatefulWidget {
 }
 
 class _DostKhataScreenState extends State<DostKhataScreen> {
+  String _activeFilter = "Sabhi"; // Sabhi, Lena Hai, Dena Hai
   String _searchQuery = "";
-  String _activeFilter = "Sabhi";
-  FriendModel? _selectedFriend;
-  bool _isProfileExpanded = false;
-  final ScrollController _chatScrollController = ScrollController();
 
-  late Box<FriendModel> _friendsBox;
+  // OLED Luxury Dark Palette
+  static const Color oledBg = Color(0xFF000000);
+  static const Color cardSurface = Color(0xFF131315);
+  static const Color cardSurfaceLight = Color(0xFF1C1C1F);
+  static const Color greenAccent = Color(0xFF00E676);
+  static const Color greenPillBg = Color(0xFF0B291A);
+  static const Color redAccent = Color(0xFFFF5252);
+  static const Color redPillBg = Color(0xFF2E1215);
+  static const Color textMuted = Color(0xFF888890);
+  static const Color textMutedDark = Color(0xFF55555C);
 
-  @override
-  void initState() {
-    super.initState();
-    _friendsBox = Hive.box<FriendModel>('friends_box');
-  }
+  // Sample data according to design reference
+  final List<Map<String, dynamic>> _dostList = [
+    {
+      "initials": "SK",
+      "name": "Sahil",
+      "desc": "dan kar diya bas aise hi",
+      "time": "Aaj",
+      "amount": "100.00",
+      "status": "+₹100 lena",
+      "isLena": true,
+    },
+    {
+      "initials": "MS",
+      "name": "Mahaveer Shinha",
+      "desc": "selun bal katai",
+      "time": "Aaj",
+      "amount": "150.00",
+      "status": "+₹150 lena",
+      "isLena": true,
+    },
+    {
+      "initials": "RN",
+      "name": "Ranu",
+      "desc": "patni davai ilaj",
+      "time": "Kal",
+      "amount": "50.00",
+      "status": "+₹50 lena",
+      "isLena": true,
+    },
+    {
+      "initials": "JN",
+      "name": "Janu",
+      "desc": "dhandhe ka hisaab",
+      "time": "28 Oct",
+      "amount": "150.00",
+      "status": "-₹150 dena",
+      "isLena": false,
+    },
+  ];
 
-  @override
-  void dispose() {
-    _chatScrollController.dispose();
-    super.dispose();
-  }
-
-  void _scrollToBottom() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (_chatScrollController.hasClients) {
-        _chatScrollController.animateTo(
-          _chatScrollController.position.maxScrollExtent,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
-      }
-    });
-  }
-
-  // Parse different date formats safely to DateTime
-  DateTime _parseTxDate(dynamic rawDate) {
-    if (rawDate == null) return DateTime.fromMillisecondsSinceEpoch(0);
-    if (rawDate is DateTime) return rawDate;
-    final str = rawDate.toString().trim();
-    final parsed = DateTime.tryParse(str);
-    if (parsed != null) return parsed;
-
-    // Handle "DD/MM HH:mm" or similar patterns fallback
-    try {
-      final parts = str.split(' ');
-      if (parts.isNotEmpty && parts[0].contains('/')) {
-        final dParts = parts[0].split('/');
-        final day = int.tryParse(dParts[0]) ?? 1;
-        final month = int.tryParse(dParts[1]) ?? 1;
-        int hour = 0;
-        int minute = 0;
-        if (parts.length > 1 && parts[1].contains(':')) {
-          final tParts = parts[1].split(':');
-          hour = int.tryParse(tParts[0]) ?? 0;
-          minute = int.tryParse(tParts[1]) ?? 0;
-        }
-        final now = DateTime.now();
-        return DateTime(now.year, month, day, hour, minute);
-      }
-    } catch (_) {}
-    return DateTime.fromMillisecondsSinceEpoch(0);
-  }
-
-  // 1. Action: Delete a single chat entry
-  void _deleteChatTransaction(FriendModel friend, Map<dynamic, dynamic> targetTx) {
-    final int amount = (targetTx["amount"] as num?)?.toInt() ?? 0;
-    final String type = targetTx["type"] ?? "diya";
-    final String txTitle = targetTx["title"] ?? "Entry";
-
-    setState(() {
-      friend.history.remove(targetTx);
-
-      if (type == "diya") {
-        friend.balance -= amount;
-      } else if (type == "liya") {
-        friend.balance += amount;
-      }
-
-      if (friend.balance > 0) {
-        friend.type = "lena";
-      } else if (friend.balance < 0) {
-        friend.type = "dena";
-      } else {
-        friend.type = "settled";
-      }
-
-      if (friend.history.isNotEmpty) {
-        friend.lastMessage = friend.history.last["title"] ?? "";
-        friend.lastDate = friend.history.last["date"] ?? "";
-      } else {
-        friend.lastMessage = "Khata ready";
-        friend.lastDate = "";
-      }
-    });
-
-    friend.save();
-
-    AppToast.show(
+  void _openChat(Map<String, dynamic> dost) {
+    Navigator.push(
       context,
-      title: "'$txTitle' delete kar diya gaya!",
-      type: ToastType.error,
-    );
-  }
-
-  // 2. 5-Second Timed Confirmation Dialog for Settle
-  void _showTimedSettleConfirmation(FriendModel friend) {
-    if (friend.balance == 0 || friend.type == "settled") {
-      AppToast.show(
-        context,
-        title: "Hisaab pehle se chukta hai!",
-        type: ToastType.warning,
-      );
-      return;
-    }
-
-    int remainingSeconds = 5;
-    Timer? countdownTimer;
-
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (ctx) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            countdownTimer ??= Timer.periodic(const Duration(seconds: 1), (timer) {
-              if (remainingSeconds > 1) {
-                setDialogState(() {
-                  remainingSeconds--;
-                });
-              } else {
-                setDialogState(() {
-                  remainingSeconds = 0;
-                });
-                timer.cancel();
-              }
-            });
-
-            const primaryColor = Color(0xFF9E3626);
-            final isLena = friend.type == "lena";
-
-            return AlertDialog(
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(22)),
-              title: Row(
-                children: const [
-                  Icon(Icons.warning_amber_rounded, color: Color(0xFFC62828), size: 24),
-                  SizedBox(width: 8),
-                  Text("Confirm Settle?", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    "Kya aap sach mein ${friend.name} ka pura hisaab chukta (zero) karna chahte hain?",
-                    style: const TextStyle(fontSize: 13, color: Colors.black87),
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF9F5F0),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          isLena ? "Lena Banta Tha:" : "Dena Banta Tha:",
-                          style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          "₹${friend.balance}",
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                            color: isLena ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    remainingSeconds > 0
-                        ? "Galti se click hone se bachane ke liye $remainingSeconds second wait karein..."
-                        : "Ab aap confirm button daba sakte hain.",
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: remainingSeconds > 0 ? primaryColor : Colors.grey.shade700,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    countdownTimer?.cancel();
-                    Navigator.pop(ctx);
-                  },
-                  child: const Text("Cancel", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-                ),
-                ElevatedButton(
-                  onPressed: remainingSeconds == 0
-                      ? () {
-                          countdownTimer?.cancel();
-                          Navigator.pop(ctx);
-                          _executeAccountSettlement(friend);
-                        }
-                      : null,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: primaryColor,
-                    disabledBackgroundColor: Colors.grey.shade300,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: Text(
-                    remainingSeconds > 0 ? "Wait (${remainingSeconds}s)" : "Confirm Chukta",
-                    style: TextStyle(
-                      color: remainingSeconds > 0 ? Colors.grey.shade600 : Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
-
-  // 3. Settle Execute
-  void _executeAccountSettlement(FriendModel friend) {
-    final int settledAmount = friend.balance;
-    final String prevType = friend.type;
-    final now = DateTime.now();
-
-    setState(() {
-      friend.balance = 0;
-      friend.type = 'settled';
-      friend.lastMessage = "Hisaab pura settle kar diya";
-      friend.lastDate = "Today";
-
-      friend.history.add({
-        "title": "Full Settlement (Hisaab Chukta)",
-        "amount": settledAmount,
-        "type": prevType == "lena" ? "liya" : "diya",
-        "date": "${now.day}/${now.month} ${now.hour}:${now.minute.toString().padLeft(2, '0')}",
-        "rawDate": now.toIso8601String(),
-        "mode": "Settled",
-      });
-      _isProfileExpanded = false;
-    });
-
-    friend.save();
-    _scrollToBottom();
-
-    AppToast.show(
-      context,
-      title: "${friend.name} ka hisaab chukta ho gaya!",
-      type: ToastType.success,
-    );
-  }
-
-  // 4. Edit Friend Details
-  void _openEditFriendDialog(FriendModel friend) {
-    final nameCtrl = TextEditingController(text: friend.name);
-    final phoneCtrl = TextEditingController(text: friend.phone);
-    final descCtrl = TextEditingController(text: friend.desc);
-    const primaryColor = Color(0xFF9E3626);
-
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Khata Edit Karein", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: nameCtrl,
-              decoration: const InputDecoration(labelText: "Dost Ka Naam", prefixIcon: Icon(Icons.person, color: primaryColor)),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: phoneCtrl,
-              decoration: const InputDecoration(labelText: "Mobile Number", prefixIcon: Icon(Icons.phone, color: primaryColor)),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: descCtrl,
-              decoration: const InputDecoration(labelText: "Description / Note", prefixIcon: Icon(Icons.notes, color: primaryColor)),
-            ),
-          ],
+      MaterialPageRoute(
+        builder: (context) => HisabChatScreen(
+          friendName: dost["name"],
+          netAmount: dost["amount"],
+          isLena: dost["isLena"],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              if (nameCtrl.text.trim().isEmpty) return;
-              setState(() {
-                friend.name = nameCtrl.text.trim();
-                friend.phone = phoneCtrl.text.trim();
-                friend.desc = descCtrl.text.trim();
-              });
-              friend.save();
-              Navigator.pop(ctx);
-              AppToast.show(
-                context,
-                title: "${friend.name} ki details update ho gayi!",
-                type: ToastType.success,
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: primaryColor,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text("Save Changes", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
-
-  // 5. Delete Entire Friend Account
-  void _confirmDeleteFriend(FriendModel friend) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text("Khata Delete Karein?", style: TextStyle(fontWeight: FontWeight.bold, color: Color(0xFFC62828), fontSize: 16)),
-        content: Text("Kya aap sach me '${friend.name}' ka pura khata aur statement delete karna chahte hain?"),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text("Cancel", style: TextStyle(color: Colors.grey)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final deletedName = friend.name;
-              setState(() {
-                _selectedFriend = null;
-                _isProfileExpanded = false;
-              });
-              friend.delete();
-              Navigator.pop(ctx);
-              AppToast.show(
-                context,
-                title: "$deletedName ka khata delete ho gaya!",
-                type: ToastType.error,
-              );
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFFC62828),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text("Yes, Delete", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-          ),
-        ],
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    const primaryColor = Color(0xFF9E3626);
-    const textDark = Color(0xFF1E1E1E);
-    const cardColor = Colors.white;
-    const textMuted = Color(0xFF7A7A7A);
-    
-    // =========================================================
-    // VIEW 1: STATEMENT / CHAT VIEW (CHRONOLOGICAL ORDER)
-    // =========================================================
-    if (_selectedFriend != null) {
-      final isLena = _selectedFriend!.type == "lena";
-      final isSettled = _selectedFriend!.balance == 0 || _selectedFriend!.type == "settled";
+    final filteredList = _dostList.where((dost) {
+      final nameMatches =
+          dost["name"].toString().toLowerCase().contains(
+            _searchQuery.toLowerCase(),
+          ) ||
+          dost["desc"].toString().toLowerCase().contains(
+            _searchQuery.toLowerCase(),
+          );
+      if (!nameMatches) return false;
 
-      // Chronological sort: Sabse purana upar, sabse naya bottom me
-      final List<Map<dynamic, dynamic>> sortedHistory = List.from(_selectedFriend!.history);
-      sortedHistory.sort((a, b) {
-        final dateA = _parseTxDate(a["rawDate"] ?? a["date"]);
-        final dateB = _parseTxDate(b["rawDate"] ?? b["date"]);
-        return dateA.compareTo(dateB);
-      });
+      if (_activeFilter == "Lena Hai") return dost["isLena"] == true;
+      if (_activeFilter == "Dena Hai") return dost["isLena"] == false;
+      return true;
+    }).toList();
 
-      _scrollToBottom();
+    final int lenaCount = _dostList.where((d) => d["isLena"] == true).length;
+    final int denaCount = _dostList.where((d) => d["isLena"] == false).length;
 
-      return Scaffold(
-        backgroundColor: const Color(0xFFF9F5F0),
-        appBar: AppBar(
-          backgroundColor: Colors.white,
-          elevation: 0.5,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, color: textDark, size: 18),
-            onPressed: () {
-              setState(() {
-                _selectedFriend = null;
-                _isProfileExpanded = false;
-              });
-            },
-          ),
-          titleSpacing: 0,
-          title: InkWell(
-            onTap: () => setState(() => _isProfileExpanded = !_isProfileExpanded),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 17,
-                  backgroundColor: const Color(0xFFF3EBE1),
-                  child: Text(
-                    _selectedFriend!.name.isNotEmpty ? _selectedFriend!.name[0].toUpperCase() : '?',
-                    style: const TextStyle(fontWeight: FontWeight.bold, color: primaryColor, fontSize: 13),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _selectedFriend!.name,
-                        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textDark),
+    return Scaffold(
+      backgroundColor: oledBg,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 110),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. Signature Top Bar
+              Padding(
+                padding: const EdgeInsets.only(top: 4, bottom: 6),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 14, left: 2),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: const [
+                          Text(
+                            "HISAAB",
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: 1.1,
+                            ),
+                          ),
+                          SizedBox(width: 3),
+                          Text(
+                            "+",
+                            style: TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: greenAccent,
+                            ),
+                          ),
+                        ],
                       ),
-                      Text(
-                        _selectedFriend!.phone.isNotEmpty ? _selectedFriend!.phone : "Khata Contact",
-                        style: const TextStyle(fontSize: 10, color: Colors.grey),
+                    ),
+                    Expanded(
+                      child: Container(
+                        height: 44,
+                        padding: const EdgeInsets.symmetric(horizontal: 14),
+                        decoration: BoxDecoration(
+                          color: cardSurface,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.05),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(
+                              Icons.search_rounded,
+                              size: 18,
+                              color: textMuted,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: TextField(
+                                onChanged: (val) =>
+                                    setState(() => _searchQuery = val),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12.5,
+                                ),
+                                decoration: const InputDecoration(
+                                  hintText: "Search dost, kharcha...",
+                                  hintStyle: TextStyle(
+                                    color: textMuted,
+                                    fontSize: 12.5,
+                                    fontWeight: FontWeight.w400,
+                                  ),
+                                  border: InputBorder.none,
+                                  isDense: true,
+                                ),
+                              ),
+                            ),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 4),
+                              child: Text(
+                                "|",
+                                style: TextStyle(
+                                  color: textMutedDark,
+                                  fontSize: 16,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 4),
+                            const Icon(
+                              Icons.more_vert_rounded,
+                              size: 18,
+                              color: textMuted,
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            IconButton(
-              icon: AnimatedRotation(
-                turns: _isProfileExpanded ? 0.5 : 0.0,
-                duration: const Duration(milliseconds: 200),
-                child: const Icon(Icons.keyboard_arrow_down_rounded, color: primaryColor, size: 26),
-              ),
-              onPressed: () => setState(() => _isProfileExpanded = !_isProfileExpanded),
-            ),
-          ],
-        ),
-        body: Column(
-          children: [
-            // Expandable Action Box (Includes Settle, Edit & Delete)
-            AnimatedCrossFade(
-              duration: const Duration(milliseconds: 220),
-              crossFadeState: _isProfileExpanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
-              firstChild: const SizedBox.shrink(),
-              secondChild: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 4)),
+                    ),
                   ],
                 ),
+              ),
+
+              const SizedBox(height: 18),
+
+              // 2. Net Ledger Ring Card
+              Container(
+                padding: const EdgeInsets.fromLTRB(18, 22, 18, 20),
+                decoration: BoxDecoration(
+                  color: cardSurface,
+                  borderRadius: BorderRadius.circular(28),
+                  border: Border.all(color: Colors.white.withOpacity(0.04)),
+                ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Row(
                       children: [
-                        const Icon(Icons.info_outline_rounded, size: 16, color: Colors.grey),
-                        const SizedBox(width: 6),
+                        // Ultra HD Circular Net Arc
+                        Container(
+                          width: 96,
+                          height: 96,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: const Color(0xFF151518),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.04),
+                              width: 1,
+                            ),
+                          ),
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              CustomPaint(
+                                size: const Size(96, 96),
+                                painter: _NetRadialChartPainter(
+                                  greenFraction: 0.65,
+                                  redFraction: 0.35,
+                                ),
+                              ),
+                              Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Text(
+                                    "NET",
+                                    style: TextStyle(
+                                      color: Color(0xFF888890),
+                                      fontSize: 9.5,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                  SizedBox(height: 2),
+                                  Text(
+                                    "+₹150",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15.5,
+                                      fontWeight: FontWeight.w900,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        const SizedBox(width: 18),
+
+                        // Lena / Dena Details
                         Expanded(
-                          child: Text(
-                            _selectedFriend!.desc.isNotEmpty ? _selectedFriend!.desc : "No description added",
-                            style: const TextStyle(fontSize: 12, color: Colors.black87, fontWeight: FontWeight.w500),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // Lena Hai Row
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 7,
+                                    height: 7,
+                                    decoration: const BoxDecoration(
+                                      color: greenAccent,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Text(
+                                    "Lena Hai",
+                                    style: TextStyle(
+                                      color: textMuted,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: greenPillBg,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text(
+                                      "+₹150 aaj",
+                                      style: TextStyle(
+                                        color: greenAccent,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              const Text(
+                                "₹300.00",
+                                style: TextStyle(
+                                  color: greenAccent,
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+
+                              const SizedBox(height: 12),
+
+                              // Dena Hai Row
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 7,
+                                    height: 7,
+                                    decoration: const BoxDecoration(
+                                      color: redAccent,
+                                      shape: BoxShape.circle,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 6),
+                                  const Text(
+                                    "Dena Hai",
+                                    style: TextStyle(
+                                      color: textMuted,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  const Spacer(),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: redPillBg,
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text(
+                                      "-₹150 aaj",
+                                      style: TextStyle(
+                                        color: redAccent,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 3),
+                              const Text(
+                                "₹150.00",
+                                style: TextStyle(
+                                  color: redAccent,
+                                  fontSize: 19,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      "Total Transactions: ${sortedHistory.length} records",
-                      style: const TextStyle(fontSize: 11, color: Colors.grey),
-                    ),
-                    const SizedBox(height: 12),
 
-                    // Settle Button inside expand section
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton.icon(
-                        onPressed: isSettled ? null : () => _showTimedSettleConfirmation(_selectedFriend!),
-                        icon: const Icon(Icons.verified_outlined, size: 16, color: Colors.white),
-                        label: Text(
-                          isSettled ? "Hisaab Already Chukta Hai" : "Hisaab Settle Karein (Chukta)",
-                          style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: isSettled ? Colors.grey : primaryColor,
-                          disabledBackgroundColor: Colors.grey.shade300,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                          padding: const EdgeInsets.symmetric(vertical: 10),
-                          elevation: 0,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 10),
+                    const SizedBox(height: 22),
 
+                    // Count Pill & + Naya Khata Row
                     Row(
                       children: [
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _openEditFriendDialog(_selectedFriend!),
-                            icon: const Icon(Icons.edit_outlined, size: 15, color: primaryColor),
-                            label: const Text("Edit Khata", style: TextStyle(fontSize: 12, color: primaryColor, fontWeight: FontWeight.bold)),
-                            style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: primaryColor.withValues(alpha: 0.4)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                            ),
+                        Container(
+                          height: 44,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            color: cardSurfaceLight,
+                            borderRadius: BorderRadius.circular(22),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(
+                                Icons.credit_card_outlined,
+                                color: textMuted,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                "${_dostList.length} Dost",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _confirmDeleteFriend(_selectedFriend!),
-                            icon: const Icon(Icons.delete_outline_rounded, size: 15, color: Color(0xFFC62828)),
-                            label: const Text("Delete Khata", style: TextStyle(fontSize: 12, color: Color(0xFFC62828), fontWeight: FontWeight.bold)),
-                            style: OutlinedButton.styleFrom(
-                              side: BorderSide(color: const Color(0xFFC62828).withValues(alpha: 0.4)),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              padding: const EdgeInsets.symmetric(vertical: 8),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-
-            // Top Clean Balance Strip
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-              color: Colors.white,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        isSettled ? "STATUS" : (isLena ? "NET LENA HAI" : "NET DENA HAI"),
-                        style: const TextStyle(fontSize: 10, fontWeight: FontWeight.bold, color: Colors.grey),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        isSettled ? "₹0 (Chukta)" : "₹${_selectedFriend!.balance}",
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w900,
-                          color: isSettled
-                              ? Colors.grey
-                              : (isLena ? const Color(0xFF2E7D32) : const Color(0xFFC62828)),
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF9F5F0),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      isSettled ? "Settled" : (isLena ? "Pending In" : "Pending Out"),
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: isSettled ? Colors.grey : (isLena ? const Color(0xFF2E7D32) : const Color(0xFFC62828)),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1, color: Color(0xFFEFE9E2)),
-
-            // Transactions Statement Flow (Old at Top -> New at Bottom)
-            Expanded(
-              child: sortedHistory.isEmpty
-                  ? const Center(child: Text("Is dost ka koi hisaab nahi hai.", style: TextStyle(color: Colors.grey)))
-                  : ListView.builder(
-                      controller: _chatScrollController,
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 110),
-                      itemCount: sortedHistory.length,
-                      itemBuilder: (ctx, index) {
-                        final tx = sortedHistory[index];
-                        final isDiya = tx["type"] == "diya";
-
-                        return Dismissible(
-                          key: ValueKey("chat_tx_${index}_${tx['title']}_${tx['date']}_${tx['amount']}"),
-                          direction: isDiya ? DismissDirection.endToStart : DismissDirection.startToEnd,
-                          background: Container(
-                            alignment: isDiya ? Alignment.centerRight : Alignment.centerLeft,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            margin: const EdgeInsets.only(bottom: 10),
+                        const Spacer(),
+                        InkWell(
+                          onTap: () {},
+                          borderRadius: BorderRadius.circular(24),
+                          child: Container(
+                            height: 44,
+                            padding: const EdgeInsets.symmetric(horizontal: 20),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFC62828),
-                              borderRadius: BorderRadius.circular(16),
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(24),
                             ),
                             child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.delete_outline, color: Colors.white, size: 20),
-                                const SizedBox(width: 4),
-                                const Text("Delete", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                              children: const [
+                                Icon(
+                                  Icons.person_add_alt_1_rounded,
+                                  size: 16,
+                                  color: Colors.black,
+                                ),
+                                SizedBox(width: 6),
+                                Text(
+                                  "+ Naya Khata",
+                                  style: TextStyle(
+                                    color: Colors.black,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
                               ],
                             ),
                           ),
-                          confirmDismiss: (direction) async {
-                            return await showDialog<bool>(
-                              context: context,
-                              builder: (dCtx) => AlertDialog(
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-                                title: const Text("Entry Delete Karein?", style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
-                                content: Text("Kya aap sach me '${tx['title']}' (₹${tx['amount']}) ki entry delete karna chahte hain?"),
-                                actions: [
-                                  TextButton(
-                                    onPressed: () => Navigator.pop(dCtx, false),
-                                    child: const Text("Cancel", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-                                  ),
-                                  ElevatedButton(
-                                    onPressed: () => Navigator.pop(dCtx, true),
-                                    style: ElevatedButton.styleFrom(
-                                      backgroundColor: const Color(0xFFC62828),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                    ),
-                                    child: const Text("Delete", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                          onDismissed: (direction) {
-                            _deleteChatTransaction(_selectedFriend!, tx);
-                          },
-                          child: Align(
-                            alignment: isDiya ? Alignment.centerRight : Alignment.centerLeft,
-                            child: Container(
-                              margin: const EdgeInsets.only(bottom: 10),
-                              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.78),
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: isDiya ? const Color(0xFFE8F5E9) : Colors.white,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: const Radius.circular(16),
-                                  topRight: const Radius.circular(16),
-                                  bottomLeft: Radius.circular(isDiya ? 16 : 4),
-                                  bottomRight: Radius.circular(isDiya ? 4 : 16),
-                                ),
-                                border: Border.all(
-                                  color: isDiya ? const Color(0xFFC8E6C9) : Colors.grey.shade300,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 6, offset: const Offset(0, 2)),
-                                ],
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Text(
-                                        isDiya ? "+₹${tx['amount']} (Diya)" : "-₹${tx['amount']} (Liya)",
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          fontWeight: FontWeight.w900,
-                                          color: isDiya ? const Color(0xFF2E7D32) : const Color(0xFFC62828),
-                                        ),
-                                      ),
-                                      const Spacer(),
-                                      Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                        decoration: BoxDecoration(
-                                          color: Colors.black.withValues(alpha: 0.04),
-                                          borderRadius: BorderRadius.circular(6),
-                                        ),
-                                        child: Text(
-                                          tx["mode"] ?? "UPI",
-                                          style: const TextStyle(fontSize: 9, color: Colors.black54),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 5),
-                                  Text(
-                                    tx["title"] ?? "Hisaab",
-                                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: textDark),
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    tx["date"] ?? "",
-                                    style: const TextStyle(fontSize: 9, color: Colors.grey),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-            ),
-          ],
-        ),
-      );
-    }
-// =========================================================
-    // VIEW 2: ALL FRIENDS LIST (LIVE FROM HIVE)
-    // =========================================================
-    return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 10),
-              child: Container(
-                height: 48,
-                padding: const EdgeInsets.symmetric(horizontal: 14),
-                decoration: BoxDecoration(
-                  color: cardColor,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 3)),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    const Text(
-                      "HISAAB+",
-                      style: TextStyle(
-                        color: primaryColor,
-                        fontWeight: FontWeight.w900,
-                        fontSize: 17,
-                        letterSpacing: 1.0,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Container(width: 1, height: 20, color: Colors.grey.shade300),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        onChanged: (val) => setState(() => _searchQuery = val),
-                        style: const TextStyle(fontSize: 13, color: textDark),
-                        decoration: const InputDecoration(
-                          hintText: "Dost ka naam ya hisaab search...",
-                          hintStyle: TextStyle(fontSize: 12, color: textMuted),
-                          icon: Icon(Icons.search_rounded, size: 19, color: Colors.grey),
-                          border: InputBorder.none,
-                          isDense: true,
                         ),
-                      ),
+                      ],
                     ),
                   ],
                 ),
               ),
-            ),
 
-            Padding(
-              padding: const EdgeInsets.only(left: 16, bottom: 8),
-              child: SingleChildScrollView(
-                scrollDirection: Axis.horizontal,
-                physics: const BouncingScrollPhysics(),
-                child: Row(
-                  children: ["Sabhi", "Lena Hai", "Dena Hai"].map((filter) {
-                    final isSelected = _activeFilter == filter;
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: ChoiceChip(
-                        label: Text(filter),
-                        selected: isSelected,
-                        selectedColor: const Color(0xFFF3EBE1),
-                        labelStyle: TextStyle(
-                          fontSize: 11,
-                          color: isSelected ? primaryColor : Colors.black87,
-                          fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                        ),
-                        onSelected: (val) => setState(() => _activeFilter = filter),
-                      ),
-                    );
-                  }).toList(),
+              const SizedBox(height: 18),
+
+              // 3. Category Filter Chips
+              Row(
+                children: [
+                  _buildFilterChip("Sabhi", _dostList.length, null),
+                  const SizedBox(width: 8),
+                  _buildFilterChip("Lena Hai", lenaCount, greenAccent),
+                  const SizedBox(width: 8),
+                  _buildFilterChip("Dena Hai", denaCount, redAccent),
+                ],
+              ),
+
+              const SizedBox(height: 24),
+
+              // 4. Section Title
+              const Text(
+                "Active Dost",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
                 ),
               ),
-            ),
 
-            Expanded(
-              child: ValueListenableBuilder<Box<FriendModel>>(
-                valueListenable: _friendsBox.listenable(),
-                builder: (context, box, _) {
-                  final allFriends = box.values.toList();
+              const SizedBox(height: 12),
 
-                  final filteredList = allFriends.where((friend) {
-                    final matchesSearch = friend.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-                        friend.lastMessage.toLowerCase().contains(_searchQuery.toLowerCase());
-
-                    if (!matchesSearch) return false;
-                    if (_activeFilter == "Lena Hai") return friend.type == "lena";
-                    if (_activeFilter == "Dena Hai") return friend.type == "dena";
-                    return true;
-                  }).toList();
-
-                  if (filteredList.isEmpty) {
-                    return Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: const [
-                          Icon(Icons.people_outline, size: 44, color: Colors.grey),
-                          SizedBox(height: 8),
-                          Text("Koi khata nahi mila! Nayi entry se add karein.", style: TextStyle(color: Colors.grey, fontSize: 13)),
-                        ],
-                      ),
-                    );
-                  }
-
-                  return ListView.separated(
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 110),
-                    itemCount: filteredList.length,
-                    separatorBuilder: (ctx, i) => const SizedBox(height: 8),
-                    itemBuilder: (context, index) {
-                      final item = filteredList[index];
-                      final isLena = item.type == "lena";
-                      final isSettled = item.balance == 0 || item.type == "settled";
-
-                      Color balanceColor;
-                      String balanceText;
-                      if (isSettled) {
-                        balanceColor = Colors.grey;
-                        balanceText = "₹0 (Chukta)";
-                      } else if (isLena) {
-                        balanceColor = const Color(0xFF2E7D32);
-                        balanceText = "+₹${item.balance}";
-                      } else {
-                        balanceColor = const Color(0xFFC62828);
-                        balanceText = "-₹${item.balance}";
-                      }
-
-                      return InkWell(
-                        onTap: () => setState(() => _selectedFriend = item),
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(16),
-                            boxShadow: [
-                              BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 6, offset: const Offset(0, 2)),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              CircleAvatar(
-                                radius: 22,
-                                backgroundColor: const Color(0xFFF3EBE1),
-                                child: Text(
-                                  item.name.isNotEmpty ? item.name[0].toUpperCase() : '?',
-                                  style: const TextStyle(fontWeight: FontWeight.bold, color: primaryColor, fontSize: 16),
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Row(
-                                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                      children: [
-                                        Text(
-                                          item.name,
-                                          style: const TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: textDark),
-                                        ),
-                                        Text(
-                                          item.lastDate.isNotEmpty ? item.lastDate : "Recently",
-                                          style: const TextStyle(fontSize: 10, color: Colors.grey),
-                                        ),
-                                      ],
-                                    ),
-                                    const SizedBox(height: 3),
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: Text(
-                                            item.lastMessage.isNotEmpty ? item.lastMessage : (item.desc.isNotEmpty ? item.desc : "Khata ready"),
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(fontSize: 11, color: Colors.black54),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 6),
-                                        Text(
-                                          balanceText,
-                                          style: TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w800,
-                                            color: balanceColor,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      );
-                    },
+              // 5. Active Dost Ledger List
+              if (filteredList.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 40),
+                  child: Center(
+                    child: Text(
+                      "Koi dost nahi mila",
+                      style: TextStyle(color: textMuted, fontSize: 13),
+                    ),
+                  ),
+                )
+              else
+                ...filteredList.map((dost) {
+                  return _buildDostTile(
+                    initials: dost["initials"],
+                    name: dost["name"],
+                    desc: dost["desc"],
+                    time: dost["time"],
+                    amount: dost["amount"],
+                    status: dost["status"],
+                    isLena: dost["isLena"],
+                    onTap: () => _openChat(dost),
                   );
-                },
+                }),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterChip(String label, int count, Color? dotColor) {
+    final bool isSelected = _activeFilter == label;
+    return GestureDetector(
+      onTap: () => setState(() => _activeFilter = label),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isSelected ? const Color(0xFF222228) : cardSurface,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? Colors.white24 : Colors.white.withOpacity(0.04),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (dotColor != null) ...[
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: dotColor,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+            ] else if (isSelected) ...[
+              Container(
+                width: 6,
+                height: 6,
+                decoration: const BoxDecoration(
+                  color: greenAccent,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: 6),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : textMuted,
+                fontSize: 11.5,
+                fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              "$count",
+              style: TextStyle(
+                color: isSelected ? Colors.white70 : textMutedDark,
+                fontSize: 11.5,
+                fontWeight: FontWeight.bold,
               ),
             ),
           ],
@@ -942,5 +569,168 @@ class _DostKhataScreenState extends State<DostKhataScreen> {
       ),
     );
   }
-    
+
+  Widget _buildDostTile({
+    required String initials,
+    required String name,
+    required String desc,
+    required String time,
+    required String amount,
+    required String status,
+    required bool isLena,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      decoration: BoxDecoration(
+        color: cardSurface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Colors.white.withOpacity(0.04)),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(22),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0xFF1E1E22),
+                  ),
+                  child: Center(
+                    child: Text(
+                      initials,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        name,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        "$desc • $time",
+                        style: const TextStyle(color: textMuted, fontSize: 11),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      "₹$amount",
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 14.5,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      status,
+                      style: TextStyle(
+                        color: isLena ? greenAccent : redAccent,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// HD Retina Dual-Arc Painter
+class _NetRadialChartPainter extends CustomPainter {
+  final double greenFraction;
+  final double redFraction;
+
+  _NetRadialChartPainter({
+    required this.greenFraction,
+    required this.redFraction,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radius = (size.width / 2) - 6;
+    const strokeWidth = 8.0;
+
+    final trackPaint = Paint()
+      ..color = const Color(0xFF1B1B20)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..isAntiAlias = true;
+
+    canvas.drawCircle(center, radius, trackPaint);
+
+    final rect = Rect.fromCircle(center: center, radius: radius);
+
+    final greenPaint = Paint()
+      ..color = const Color(0xFF00E676)
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = strokeWidth
+      ..isAntiAlias = true;
+
+    final redPaint = Paint()
+      ..color = const Color(0xFFFF5252)
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round
+      ..strokeWidth = strokeWidth
+      ..isAntiAlias = true;
+
+    const startAngle = -pi / 2;
+    const gap = 0.28;
+
+    final greenSweep = (2 * pi * greenFraction) - gap;
+    final redSweep = (2 * pi * redFraction) - gap;
+
+    if (greenFraction > 0) {
+      canvas.drawArc(rect, startAngle, greenSweep, false, greenPaint);
+    }
+
+    if (redFraction > 0) {
+      canvas.drawArc(
+        rect,
+        startAngle + greenSweep + gap,
+        redSweep,
+        false,
+        redPaint,
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _NetRadialChartPainter oldDelegate) =>
+      oldDelegate.greenFraction != greenFraction ||
+      oldDelegate.redFraction != redFraction;
 }
