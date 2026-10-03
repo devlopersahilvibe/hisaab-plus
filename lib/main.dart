@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 
 import 'models/transaction_model.dart';
@@ -11,15 +12,34 @@ import 'widgets/bottom_nav_bar.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Status & Navigation bar ko Pitch Black look dena
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      systemNavigationBarColor: Color(0xFF000000),
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+  );
+
   await Hive.initFlutter();
 
-  // Adapters registration
-  Hive.registerAdapter(TransactionModelAdapter());
-  Hive.registerAdapter(FriendModelAdapter());
+  // Adapters register karo
+  if (!Hive.isAdapterRegistered(0)) {
+    Hive.registerAdapter(TransactionModelAdapter());
+  }
+  if (!Hive.isAdapterRegistered(1)) {
+    Hive.registerAdapter(FriendModelAdapter());
+  }
 
-  // Database boxes open karo
-  await Hive.openBox<TransactionModel>('transactions_box');
-  await Hive.openBox<FriendModel>('friends_box');
+  // Database boxes safely open karo
+  if (!Hive.isBoxOpen('transactions_box')) {
+    await Hive.openBox<TransactionModel>('transactions_box');
+  }
+  if (!Hive.isBoxOpen('friends_box')) {
+    await Hive.openBox<FriendModel>('friends_box');
+  }
 
   runApp(const HisaabApp());
 }
@@ -31,9 +51,13 @@ class HisaabApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'HISAAB+ v4.3.0',
+      title: 'HISAAB+ v4.4.0',
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: const Color(0xFF000000), // OLED Pitch Black
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Color(0xFF000000),
+          elevation: 0,
+        ),
       ),
       home: const MainNavigationScreen(),
     );
@@ -67,7 +91,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
       resizeToAvoidBottomInset: false,
       body: Stack(
         children: [
-          // Screens Switcher (State persistent aur bottom bar persist rahega)
+          // Persistent Screen Switcher
           IndexedStack(
             index: _activeTab,
             children: [
@@ -78,7 +102,7 @@ class _MainNavigationScreenState extends State<MainNavigationScreen> {
                 onOpenEntry: _openQuickEntry,
               ),
               const DostKhataScreen(),
-              const ProfileScreen(), // Nayi feature-rich Profile screen attach ho gayi
+              const ProfileScreen(),
             ],
           ),
 

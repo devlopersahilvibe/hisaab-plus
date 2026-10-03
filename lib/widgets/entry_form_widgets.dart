@@ -80,7 +80,7 @@ class EntryTopNavHeader extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: selectedCount > 0
-                    ? const Color(0xFF00E676).withOpacity(0.4)
+                    ? const Color(0xFF00E676).withValues(alpha: 0.4)
                     : borderCustom,
               ),
             ),
@@ -150,7 +150,7 @@ class EntrySearchBarAndFilters extends StatelessWidget {
             color: isSelected
                 ? Colors.white
                 : (item.type == 'tag'
-                      ? const Color(0xFF0284C7).withOpacity(0.4)
+                      ? const Color(0xFF0284C7).withValues(alpha: 0.4)
                       : borderCustom),
           ),
         ),
@@ -396,7 +396,7 @@ class AddFriendAccordionWidget extends StatelessWidget {
       decoration: BoxDecoration(
         color: surfaceCard,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: lenaGreen.withOpacity(0.45)),
+        border: Border.all(color: lenaGreen.withValues(alpha: 0.45)),
       ),
       child: Column(
         children: [
@@ -413,7 +413,9 @@ class AddFriendAccordionWidget extends StatelessWidget {
                     decoration: BoxDecoration(
                       color: const Color(0xFF0F291C),
                       shape: BoxShape.circle,
-                      border: Border.all(color: lenaGreen.withOpacity(0.5)),
+                      border: Border.all(
+                        color: lenaGreen.withValues(alpha: 0.5),
+                      ),
                     ),
                     child: const Icon(
                       Icons.person_add_rounded,
@@ -446,7 +448,7 @@ class AddFriendAccordionWidget extends StatelessWidget {
                                 color: const Color(0xFF0F291C),
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: lenaGreen.withOpacity(0.4),
+                                  color: lenaGreen.withValues(alpha: 0.4),
                                 ),
                               ),
                               child: const Text(
@@ -529,8 +531,6 @@ class AddFriendAccordionWidget extends StatelessWidget {
                     icon: Icons.notes_rounded,
                   ),
                   const SizedBox(height: 10),
-
-                  // Tag Header (No extra button, clean and minimal)
                   const Text(
                     "Tag Chunein (Optional)",
                     style: TextStyle(color: neutral400, fontSize: 11),
@@ -560,7 +560,7 @@ class AddFriendAccordionWidget extends StatelessWidget {
                                   borderRadius: BorderRadius.circular(20),
                                   border: Border.all(
                                     color: isSel
-                                        ? lenaGreen.withOpacity(0.6)
+                                        ? lenaGreen.withValues(alpha: 0.6)
                                         : borderCustom,
                                   ),
                                 ),
@@ -591,7 +591,8 @@ class AddFriendAccordionWidget extends StatelessWidget {
                               color: const Color(0xFF0C1929),
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(
-                                color: const Color(0xFF0284C7).withOpacity(0.4),
+                                color: const Color(0xFF0284C7)
+                                    .withValues(alpha: 0.4),
                               ),
                             ),
                             child: const Row(
@@ -657,12 +658,12 @@ class AddFriendAccordionWidget extends StatelessWidget {
                               ),
                             ),
                             onPressed: onSubmit,
-                            child: FittedBox(
+                            child: const FittedBox(
                               fit: BoxFit.scaleDown,
                               child: Row(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 mainAxisSize: MainAxisSize.min,
-                                children: const [
+                                children: [
                                   Text(
                                     "Dost Save Karein",
                                     style: TextStyle(
@@ -745,7 +746,9 @@ class SelectableFriendCardWidget extends StatelessWidget {
             color: isSelected ? const Color(0xFF0F1E16) : surfaceCard,
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
-              color: isSelected ? lenaGreen.withOpacity(0.8) : borderCustom,
+              color: isSelected
+                  ? lenaGreen.withValues(alpha: 0.8)
+                  : borderCustom,
               width: isSelected ? 1.2 : 1,
             ),
           ),
@@ -759,7 +762,7 @@ class SelectableFriendCardWidget extends StatelessWidget {
                   color: isSelected ? const Color(0xFF0F291C) : surfaceSec,
                   border: Border.all(
                     color: isSelected
-                        ? lenaGreen.withOpacity(0.5)
+                        ? lenaGreen.withValues(alpha: 0.5)
                         : borderCustom,
                   ),
                 ),
@@ -819,7 +822,7 @@ class SelectableFriendCardWidget extends StatelessWidget {
                   Text(
                     balanceLabel,
                     style: TextStyle(
-                      color: amountColor.withOpacity(0.85),
+                      color: amountColor.withValues(alpha: 0.85),
                       fontSize: 10,
                       fontWeight: FontWeight.w500,
                     ),
@@ -851,7 +854,7 @@ class SelectableFriendCardWidget extends StatelessWidget {
 }
 
 // -------------------------------------------------------------
-// 5. BOTTOM ENTRY DOCK BAR (✕ Button closes page)
+// 5. BOTTOM ENTRY DOCK BAR
 // -------------------------------------------------------------
 class EntryBottomDockWidget extends StatelessWidget {
   final String activeFriendName;
@@ -936,10 +939,10 @@ class EntryBottomDockWidget extends StatelessWidget {
                     borderRadius: BorderRadius.circular(6),
                     border: Border.all(
                       color: isPositive
-                          ? lenaGreen.withOpacity(0.4)
+                          ? lenaGreen.withValues(alpha: 0.4)
                           : (selectedCount == 0
                                 ? borderCustom
-                                : denaRed.withOpacity(0.4)),
+                                : denaRed.withValues(alpha: 0.4)),
                     ),
                   ),
                   child: Text(
@@ -1049,7 +1052,7 @@ class EntryBottomDockWidget extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                         border: txType == 'diya'
                             ? Border.all(
-                                color: lenaGreen.withOpacity(0.6),
+                                color: lenaGreen.withValues(alpha: 0.6),
                                 width: 1.1,
                               )
                             : Border.all(color: Colors.transparent),
@@ -1093,7 +1096,7 @@ class EntryBottomDockWidget extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                         border: txType == 'liya'
                             ? Border.all(
-                                color: denaRed.withOpacity(0.6),
+                                color: denaRed.withValues(alpha: 0.6),
                                 width: 1.1,
                               )
                             : Border.all(color: Colors.transparent),
@@ -1209,8 +1212,6 @@ class EntryBottomDockWidget extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-
-              // ✕ Button: Seedha screen close karega
               GestureDetector(
                 onTap: onClosePage,
                 child: Container(

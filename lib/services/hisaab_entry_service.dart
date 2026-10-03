@@ -10,7 +10,7 @@ class HisaabEntryService {
 
   HisaabEntryService({required this.friendsBox, required this.transBox});
 
-  /// Naya friend save karke uska generated key return karega (Tag is optional)
+  /// Naya friend save karke uska generated key return karega (Tag optional hai)
   dynamic addNewFriend({
     required String name,
     required String phone,
@@ -79,7 +79,7 @@ class HisaabEntryService {
             friend.type = 'lena';
           }
         } else {
-          // settled or 0
+          // settled or 0 balance
           friend.balance = splitAmount;
           friend.type = 'lena';
         }
@@ -98,7 +98,7 @@ class HisaabEntryService {
             friend.type = 'dena';
           }
         } else {
-          // settled or 0
+          // settled or 0 balance
           friend.balance = splitAmount;
           friend.type = 'dena';
         }
@@ -131,5 +131,28 @@ class HisaabEntryService {
         ),
       );
     }
+  }
+
+  /// Self / Personal Kharcha save karne ke liye (Bina kisi dost ke direct ledger entry)
+  void saveSelfKharcha({
+    required String title,
+    required int amount,
+    required String category,
+    required String paymentMode,
+  }) {
+    if (amount <= 0) return;
+    final now = DateTime.now();
+
+    transBox.add(
+      TransactionModel(
+        date: now,
+        title: title.trim().isNotEmpty ? title.trim() : "Kharcha",
+        subtitle: "$category • $paymentMode",
+        amount: amount,
+        iconCodePoint: Icons.receipt_long_rounded.codePoint,
+        type: 'kharcha',
+        mode: paymentMode,
+      ),
+    );
   }
 }

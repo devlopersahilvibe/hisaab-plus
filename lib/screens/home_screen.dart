@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
+import '../models/friend_model.dart';
+import '../models/transaction_model.dart';
 import '../widgets/custom_toast.dart';
 import 'entry_form_screen.dart';
 import 'hisab_chat.dart';
@@ -30,33 +33,15 @@ class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchCtrl = TextEditingController();
   String _searchQuery = "";
 
-  // Sample History Data
-  final List<Map<String, dynamic>> _historyItems = [
-    {
-      "initials": "SK",
-      "name": "Sahil Khan",
-      "timeOrDesc": "2 ghante pehle",
-      "amount": "100.00",
-      "status": "+₹100 lena",
-      "isLena": true,
-    },
-    {
-      "initials": "MS",
-      "name": "Mahaveer Shinha",
-      "timeOrDesc": "Kal (Yesterday)",
-      "amount": "150.00",
-      "status": "+₹150 lena",
-      "isLena": true,
-    },
-    {
-      "initials": "RV",
-      "name": "Rahul Verma",
-      "timeOrDesc": "28 Oct • Chai & Nashta",
-      "amount": "350.00",
-      "status": "-₹350 dena",
-      "isLena": false,
-    },
-  ];
+  late Box<TransactionModel> _transBox;
+  late Box<FriendModel> _friendsBox;
+
+  @override
+  void initState() {
+    super.initState();
+    _transBox = Hive.box<TransactionModel>('transactions_box');
+    _friendsBox = Hive.box<FriendModel>('friends_box');
+  }
 
   @override
   void dispose() {
@@ -64,23 +49,22 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void _openChat(Map<String, dynamic> item) {
+  void _openChat(String name, int amount, bool isLena) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => HisabChatScreen(
-          friendName: item["name"],
-          netAmount: item["amount"],
-          isLena: item["isLena"],
+          friendName: name,
+          netAmount: amount.toString(),
+          isLena: isLena,
         ),
       ),
     );
   }
 
-  // Issue 2 Fix: Agar MainNavigationScreen se callback aaya hai toh Tab 1 par switch karega (NavBar gayab nahi hoga)
   void _openKhata() {
     if (widget.onTabChange != null) {
-      widget.onTabChange!(1); // Tab 1 = Khata Tab
+      widget.onTabChange!(1);
     } else {
       Navigator.push(
         context,
@@ -89,7 +73,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  // Issue 3 Fix: Naya Kharcha kholne ke liye EntryFormView screen open karna
   void _openNayaKharcha() {
     if (widget.onOpenEntry != null) {
       widget.onOpenEntry!();
@@ -98,7 +81,7 @@ class _HomeScreenState extends State<HomeScreen> {
         context,
         MaterialPageRoute(
           builder: (context) => EntryFormView(
-            entryType: 0, // 0: Kharcha
+            entryType: 0,
             onClose: () => Navigator.pop(context),
           ),
         ),
@@ -106,15 +89,35 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  void _deleteTransaction(TransactionModel tx) {
+    final title = tx.title;
+    tx.delete();
+    AppToast.show(
+      context,
+      title: "'$title' record delete kar diya gaya!",
+      type: ToastType.error,
+    );
+  }
+
+  String _formatDate(DateTime dt) {
+    final now = DateTime.now();
+    if (dt.year == now.year && dt.month == now.month && dt.day == now.day) {
+      return "Aaj • ${dt.hour}:${dt.minute.toString().padLeft(2, '0')}";
+    }
+    return "${dt.day}/${dt.month}/${dt.year}";
+  }
+
+  String _getInitials(String name) {
+    if (name.trim().isEmpty) return '?';
+    final parts = name.trim().split(' ');
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return name.substring(0, name.length >= 2 ? 2 : 1).toUpperCase();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final filteredHistory = _historyItems.where((item) {
-      if (_searchQuery.isEmpty) return true;
-      final q = _searchQuery.toLowerCase();
-      return item["name"].toString().toLowerCase().contains(q) ||
-          item["timeOrDesc"].toString().toLowerCase().contains(q);
-    }).toList();
-
     return Scaffold(
       backgroundColor: oledBg,
       body: SafeArea(
@@ -130,11 +133,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    Padding(
-                      padding: const EdgeInsets.only(right: 14, left: 2),
+                    const Padding(
+                      padding: EdgeInsets.only(right: 14, left: 2),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: const [
+                        children: [
                           Text(
                             "HISAAB",
                             style: TextStyle(
@@ -164,7 +167,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           color: cardSurface,
                           borderRadius: BorderRadius.circular(24),
                           border: Border.all(
-                            color: Colors.white.withOpacity(0.05),
+                            color: Colors.white.withValues(alpha: 0.05),
                           ),
                         ),
                         child: Row(
@@ -175,7 +178,6 @@ class _HomeScreenState extends State<HomeScreen> {
                               color: textMuted,
                             ),
                             const SizedBox(width: 8),
-                            // Clickable editable TextField
                             Expanded(
                               child: TextField(
                                 controller: _searchCtrl,
@@ -227,7 +229,6 @@ class _HomeScreenState extends State<HomeScreen> {
                                 ),
                               ),
                             ),
-                            // Clickable 3-Dot Popup Menu
                             Theme(
                               data: Theme.of(context)
                                   .copyWith(cardColor: const Color(0xFF1E1E22)),
@@ -251,7 +252,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                   } else if (value == "sync") {
                                     AppToast.show(
                                       context,
-                                      title: "Cloud sync shuru ho gaya!",
+                                      title: "Data phone storage me safe hai!",
                                       type: ToastType.success,
                                     );
                                   }
@@ -269,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                         ),
                                         SizedBox(width: 10),
                                         Text(
-                                          "Sync Now",
+                                          "Sync State",
                                           style: TextStyle(
                                             color: Colors.white,
                                             fontSize: 12.5,
@@ -312,267 +313,291 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: 18),
 
-              // 2. Main Ledger Summary Card
-              Container(
-                padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
-                decoration: BoxDecoration(
-                  color: cardSurface,
-                  borderRadius: BorderRadius.circular(28),
-                  border: Border.all(color: Colors.white.withOpacity(0.04)),
-                ),
-                child: Column(
-                  children: [
-                    // Lena Hai Row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // 2. Main Ledger Summary Card (Connected to Friends & Transactions Hive Box)
+              ValueListenableBuilder(
+                valueListenable: _friendsBox.listenable(),
+                builder: (context, Box<FriendModel> fBox, _) {
+                  int totalLena = 0;
+                  int totalDena = 0;
+
+                  for (var friend in fBox.values) {
+                    if (friend.type == 'lena') {
+                      totalLena += friend.balance;
+                    } else if (friend.type == 'dena') {
+                      totalDena += friend.balance;
+                    }
+                  }
+
+                  // Aaj ka net calculation
+                  final today = DateTime.now();
+                  int todayLena = 0;
+                  int todayDena = 0;
+
+                  for (var tx in _transBox.values) {
+                    if (tx.date.year == today.year &&
+                        tx.date.month == today.month &&
+                        tx.date.day == today.day) {
+                      if (tx.type == 'lena') {
+                        todayLena += tx.amount;
+                      } else if (tx.type == 'dena') {
+                        todayDena += tx.amount;
+                      }
+                    }
+                  }
+
+                  return Container(
+                    padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+                    decoration: BoxDecoration(
+                      color: cardSurface,
+                      borderRadius: BorderRadius.circular(28),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.04),
+                      ),
+                    ),
+                    child: Column(
                       children: [
-                        const Text(
-                          "Lena Hai (Receivable)",
-                          style: TextStyle(
-                            color: textMuted,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                        // Lena Hai Row
                         Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             const Text(
-                              "₹1,250",
+                              "Lena Hai (Receivable)",
                               style: TextStyle(
-                                color: greenAccent,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
+                                color: textMuted,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: greenPillBg,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Text(
-                                "+₹250 aaj",
-                                style: TextStyle(
-                                  color: greenAccent,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
+                            Row(
+                              children: [
+                                Text(
+                                  "₹$totalLena",
+                                  style: const TextStyle(
+                                    color: greenAccent,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                 ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 14),
-
-                    // Dena Hai Row
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          "Dena Hai (Payable)",
-                          style: TextStyle(
-                            color: textMuted,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        Row(
-                          children: [
-                            const Text(
-                              "₹450",
-                              style: TextStyle(
-                                color: redAccent,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: redPillBg,
-                                borderRadius: BorderRadius.circular(10),
-                              ),
-                              child: const Text(
-                                "-₹150 aaj",
-                                style: TextStyle(
-                                  color: redAccent,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 22),
-
-                    // Action Buttons (Khata & Naya Kharcha)
-                    Row(
-                      children: [
-                        Expanded(
-                          child: InkWell(
-                            onTap: _openKhata,
-                            borderRadius: BorderRadius.circular(26),
-                            child: Container(
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: cardSurfaceElevated,
-                                borderRadius: BorderRadius.circular(26),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: const [
-                                  Text(
-                                    "Khata",
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 13.5,
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: greenPillBg,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    "+₹$todayLena aaj",
+                                    style: const TextStyle(
+                                      color: greenAccent,
+                                      fontSize: 10,
                                       fontWeight: FontWeight.w700,
                                     ),
                                   ),
-                                  SizedBox(width: 5),
-                                  Icon(
-                                    Icons.arrow_outward_rounded,
-                                    size: 14,
-                                    color: Colors.white70,
-                                  ),
-                                ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        // Dena Hai Row
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              "Dena Hai (Payable)",
+                              style: TextStyle(
+                                color: textMuted,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w500,
                               ),
                             ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: InkWell(
-                            onTap: _openNayaKharcha, // Opens EntryFormView now!
-                            borderRadius: BorderRadius.circular(26),
-                            child: Container(
-                              height: 48,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(26),
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: const [
-                                  Text(
-                                    "Naya Kharcha",
-                                    style: TextStyle(
-                                      color: Colors.black,
-                                      fontSize: 13.5,
-                                      fontWeight: FontWeight.w800,
+                            Row(
+                              children: [
+                                Text(
+                                  "₹$totalDena",
+                                  style: const TextStyle(
+                                    color: redAccent,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: redPillBg,
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Text(
+                                    "-₹$todayDena aaj",
+                                    style: const TextStyle(
+                                      color: redAccent,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w700,
                                     ),
                                   ),
-                                  SizedBox(width: 4),
-                                  Icon(
-                                    Icons.add_rounded,
-                                    size: 18,
-                                    color: Colors.black,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 22),
+
+                        // Action Buttons (Khata & Naya Kharcha)
+                        Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: _openKhata,
+                                borderRadius: BorderRadius.circular(26),
+                                child: Container(
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: cardSurfaceElevated,
+                                    borderRadius: BorderRadius.circular(26),
                                   ),
-                                ],
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        "Khata",
+                                        style: TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w700,
+                                        ),
+                                      ),
+                                      SizedBox(width: 5),
+                                      Icon(
+                                        Icons.arrow_outward_rounded,
+                                        size: 14,
+                                        color: Colors.white70,
+                                      ),
+                                    ],
+                                  ),
+                                ),
                               ),
                             ),
-                          ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: InkWell(
+                                onTap: _openNayaKharcha,
+                                borderRadius: BorderRadius.circular(26),
+                                child: Container(
+                                  height: 48,
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(26),
+                                  ),
+                                  child: const Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Text(
+                                        "Naya Kharcha",
+                                        style: TextStyle(
+                                          color: Colors.black,
+                                          fontSize: 13.5,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                      SizedBox(width: 4),
+                                      Icon(
+                                        Icons.add_rounded,
+                                        size: 18,
+                                        color: Colors.black,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
-                  ],
-                ),
+                  );
+                },
               ),
 
               const SizedBox(height: 14),
 
-              // 3. Google Drive Sync Banner Card
+              // 3. Local Data Security Banner Card
               Container(
                 padding: const EdgeInsets.fromLTRB(20, 18, 16, 20),
                 decoration: BoxDecoration(
                   color: cardSurface,
                   borderRadius: BorderRadius.circular(26),
-                  border: Border.all(color: Colors.white.withOpacity(0.04)),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.04),
+                  ),
                 ),
-                child: Stack(
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    const Positioned(
-                      right: 0,
-                      top: 0,
-                      child: Icon(
-                        Icons.close_rounded,
-                        size: 16,
-                        color: textMutedDark,
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            "Offline Storage Surakshit",
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 5),
+                          const Text(
+                            "Aapka sara hisaab aapke device me Hive database me surakshit hai.",
+                            style: TextStyle(
+                              color: textMuted,
+                              fontSize: 11,
+                              height: 1.35,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          ElevatedButton(
+                            onPressed: () {
+                              AppToast.show(
+                                context,
+                                title: "Data phone storage me sync hai!",
+                                type: ToastType.success,
+                              );
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.black,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 20,
+                                vertical: 9,
+                              ),
+                              elevation: 0,
+                            ),
+                            child: const Text(
+                              "Backup Status",
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                    Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                "Data Surakshit Rakhein",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                              const SizedBox(height: 5),
-                              const Text(
-                                "Google Drive cloud sync se hisaab hamesha surakshit rahega.",
-                                style: TextStyle(
-                                  color: textMuted,
-                                  fontSize: 11,
-                                  height: 1.35,
-                                ),
-                              ),
-                              const SizedBox(height: 14),
-                              ElevatedButton(
-                                onPressed: () {
-                                  AppToast.show(
-                                    context,
-                                    title: "Cloud sync complete!",
-                                    type: ToastType.success,
-                                  );
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: Colors.white,
-                                  foregroundColor: Colors.black,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 20,
-                                    vertical: 9,
-                                  ),
-                                  elevation: 0,
-                                ),
-                                child: const Text(
-                                  "Sync Data",
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 14),
-                        _buildCreativeSyncIcon(),
-                      ],
-                    ),
+                    const SizedBox(width: 14),
+                    _buildCreativeSyncIcon(),
                   ],
                 ),
               ),
@@ -592,7 +617,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                   InkWell(
-                    onTap: _openKhata, // Navigates to Khata tab
+                    onTap: _openKhata,
                     borderRadius: BorderRadius.circular(12),
                     child: const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
@@ -621,29 +646,153 @@ class _HomeScreenState extends State<HomeScreen> {
 
               const SizedBox(height: 12),
 
-              // 5. History Tiles
-              if (filteredHistory.isEmpty)
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 30),
-                  child: Center(
-                    child: Text(
-                      "Koi hisaab nahi mila",
-                      style: TextStyle(color: textMuted, fontSize: 13),
-                    ),
-                  ),
-                )
-              else
-                ...filteredHistory.map((item) {
-                  return _buildHistoryTile(
-                    initials: item["initials"],
-                    name: item["name"],
-                    timeOrDesc: item["timeOrDesc"],
-                    amount: "₹${item["amount"]}",
-                    status: item["status"],
-                    isLena: item["isLena"],
-                    onTap: () => _openChat(item),
+              // 5. Reactive History Tiles Connected to transactions_box
+              ValueListenableBuilder<Box<TransactionModel>>(
+                valueListenable: _transBox.listenable(),
+                builder: (context, box, _) {
+                  final allTx = box.values.toList().reversed.toList();
+
+                  final filtered = allTx.where((tx) {
+                    if (_searchQuery.isEmpty) return true;
+                    final q = _searchQuery.toLowerCase();
+                    return tx.title.toLowerCase().contains(q) ||
+                        tx.subtitle.toLowerCase().contains(q);
+                  }).toList();
+
+                  if (filtered.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 36),
+                      child: Center(
+                        child: Text(
+                          "Abhi koi hisaab ya kharcha nahi hai",
+                          style: TextStyle(color: textMuted, fontSize: 13),
+                        ),
+                      ),
+                    );
+                  }
+
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: filtered.length,
+                    itemBuilder: (context, index) {
+                      final tx = filtered[index];
+                      final isLena = tx.type == 'lena';
+                      final isKharcha = tx.type == 'kharcha';
+
+                      String status;
+                      Color statusColor;
+
+                      if (isKharcha) {
+                        status = "Kharcha";
+                        statusColor = textMuted;
+                      } else if (isLena) {
+                        status = "+₹${tx.amount} lena";
+                        statusColor = greenAccent;
+                      } else {
+                        status = "-₹${tx.amount} dena";
+                        statusColor = redAccent;
+                      }
+
+                      return Dismissible(
+                        key: Key("${tx.date.millisecondsSinceEpoch}_$index"),
+                        direction: DismissDirection.endToStart,
+                        background: Container(
+                          alignment: Alignment.centerRight,
+                          padding: const EdgeInsets.only(right: 20),
+                          margin: const EdgeInsets.only(bottom: 10),
+                          decoration: BoxDecoration(
+                            color: redAccent,
+                            borderRadius: BorderRadius.circular(22),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.delete_sweep_rounded,
+                                color: Colors.white,
+                                size: 22,
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                "Delete",
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        confirmDismiss: (direction) async {
+                          return await showDialog<bool>(
+                            context: context,
+                            builder: (ctx) => AlertDialog(
+                              backgroundColor: cardSurface,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              title: const Text(
+                                "Kharcha Delete Karein?",
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              content: Text(
+                                "Kya aap sach me '${tx.title}' (₹${tx.amount}) ko delete karna chahte hain?",
+                                style: const TextStyle(color: textMuted),
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(ctx).pop(false),
+                                  child: const Text(
+                                    "Cancel",
+                                    style: TextStyle(color: textMuted),
+                                  ),
+                                ),
+                                ElevatedButton(
+                                  onPressed: () => Navigator.of(ctx).pop(true),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: redAccent,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                  ),
+                                  child: const Text(
+                                    "Delete",
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                        onDismissed: (direction) => _deleteTransaction(tx),
+                        child: _buildHistoryTile(
+                          initials: _getInitials(tx.title),
+                          name: tx.title,
+                          timeOrDesc:
+                              "${_formatDate(tx.date)} • ${tx.subtitle}",
+                          amount: "₹${tx.amount}",
+                          status: status,
+                          statusColor: statusColor,
+                          onTap: () {
+                            if (!isKharcha) {
+                              _openChat(tx.title, tx.amount, isLena);
+                            }
+                          },
+                        ),
+                      );
+                    },
                   );
-                }),
+                },
+              ),
             ],
           ),
         ),
@@ -664,9 +813,9 @@ class _HomeScreenState extends State<HomeScreen> {
             height: 74,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.02),
+              color: Colors.white.withValues(alpha: 0.02),
               border: Border.all(
-                color: Colors.white.withOpacity(0.05),
+                color: Colors.white.withValues(alpha: 0.05),
                 width: 1,
               ),
             ),
@@ -675,7 +824,7 @@ class _HomeScreenState extends State<HomeScreen> {
             bottom: 4,
             child: Icon(
               Icons.arrow_drop_up_rounded,
-              color: Colors.white.withOpacity(0.18),
+              color: Colors.white.withValues(alpha: 0.18),
               size: 16,
             ),
           ),
@@ -686,7 +835,7 @@ class _HomeScreenState extends State<HomeScreen> {
               shape: BoxShape.circle,
               color: const Color(0xFF18181C),
               border: Border.all(
-                color: Colors.white.withOpacity(0.08),
+                color: Colors.white.withValues(alpha: 0.08),
                 width: 1,
               ),
             ),
@@ -698,12 +847,12 @@ class _HomeScreenState extends State<HomeScreen> {
               shape: BoxShape.circle,
               color: const Color(0xFF222228),
               border: Border.all(
-                color: Colors.white.withOpacity(0.12),
+                color: Colors.white.withValues(alpha: 0.12),
                 width: 1.2,
               ),
             ),
             child: const Center(
-              child: Icon(Icons.cloud_outlined, color: Colors.white, size: 21),
+              child: Icon(Icons.shield_outlined, color: Colors.white, size: 21),
             ),
           ),
         ],
@@ -717,7 +866,7 @@ class _HomeScreenState extends State<HomeScreen> {
     required String timeOrDesc,
     required String amount,
     required String status,
-    required bool isLena,
+    required Color statusColor,
     required VoidCallback onTap,
   }) {
     return Container(
@@ -725,7 +874,7 @@ class _HomeScreenState extends State<HomeScreen> {
       decoration: BoxDecoration(
         color: cardSurface,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: Colors.white.withOpacity(0.04)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.04)),
       ),
       child: Material(
         color: Colors.transparent,
@@ -761,6 +910,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     children: [
                       Text(
                         name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 13.5,
@@ -770,11 +921,14 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(height: 3),
                       Text(
                         timeOrDesc,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(color: textMuted, fontSize: 11),
                       ),
                     ],
                   ),
                 ),
+                const SizedBox(width: 8),
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
@@ -790,7 +944,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Text(
                       status,
                       style: TextStyle(
-                        color: isLena ? greenAccent : redAccent,
+                        color: statusColor,
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
                       ),

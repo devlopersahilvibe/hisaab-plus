@@ -54,7 +54,6 @@ class _EntryFormViewState extends State<EntryFormView> {
       transBox: _transBox,
     );
 
-    // Initial state: koi friend selected nahi aur koi tag selected nahi
     _stateData = EntryFormStateData(
       txType: widget.entryType == 2 ? 'liya' : 'diya',
       selectedTag: null,
@@ -119,20 +118,36 @@ class _EntryFormViewState extends State<EntryFormView> {
       return;
     }
 
+    final noteText = _noteCtrl.text.trim();
+
+    // Agar koi dost select nahi hai, toh ise direct Personal Kharcha mark karein
     if (_stateData.selectedFriendKeys.isEmpty) {
+      _entryService.saveSelfKharcha(
+        title: noteText.isNotEmpty ? noteText : "Personal Kharcha",
+        amount: amount,
+        category: _stateData.selectedTag ?? "Personal",
+        paymentMode: _stateData.selectedPaymentMode,
+      );
+
+      _amountCtrl.clear();
+      _noteCtrl.clear();
+      FocusScope.of(context).unfocus();
+
       AppToast.show(
         context,
-        title: "Kripya kam se kam ek dost chunein!",
-        type: ToastType.warning,
+        title: "₹$amount ka Personal Kharcha save ho gaya!",
+        type: ToastType.success,
       );
+      widget.onClose();
       return;
     }
 
+    // Dost ya Multi-friend split
     _entryService.saveTransaction(
       selectedFriendKeys: _stateData.selectedFriendKeys,
       totalAmount: amount,
       txType: _stateData.txType,
-      note: _noteCtrl.text.trim(),
+      note: noteText,
       paymentMode: _stateData.selectedPaymentMode,
     );
 
@@ -321,8 +336,8 @@ class _EntryFormViewState extends State<EntryFormView> {
             }
 
             final selectedCount = _stateData.selectedFriendKeys.length;
-            String activeFriendName = "Koi dost select karein";
-            String activeFriendBalance = "₹0.00";
+            String activeFriendName = "Personal (Self Kharcha)";
+            String activeFriendBalance = "Kharcha Mode";
             bool isPositiveBalance = true;
 
             if (selectedCount == 1) {
@@ -337,7 +352,7 @@ class _EntryFormViewState extends State<EntryFormView> {
               }
             } else if (selectedCount > 1) {
               activeFriendName = "$selectedCount Dost Chune Hue";
-              activeFriendBalance = "Group Entry";
+              activeFriendBalance = "Group Split";
             }
 
             return Column(
@@ -445,7 +460,7 @@ class _EntryFormViewState extends State<EntryFormView> {
                   onTxTypeChanged: (type) =>
                       setState(() => _stateData.txType = type),
                   onSave: _handleSaveHisaab,
-                  onClosePage: widget.onClose, // ✕ Click par screen close hogi
+                  onClosePage: widget.onClose,
                 ),
               ],
             );

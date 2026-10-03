@@ -1,16 +1,21 @@
 import 'package:flutter/material.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 
+import '../models/friend_model.dart';
+import '../services/hisaab_entry_service.dart';
 import '../widgets/custom_toast.dart';
 
 class HisabChatScreen extends StatefulWidget {
+  final dynamic friendKey;
   final String friendName;
   final String netAmount;
   final bool isLena;
 
   const HisabChatScreen({
     super.key,
+    this.friendKey,
     this.friendName = "Sahil",
-    this.netAmount = "100",
+    this.netAmount = "0",
     this.isLena = true,
   });
 
@@ -19,14 +24,12 @@ class HisabChatScreen extends StatefulWidget {
 }
 
 class _HisabChatScreenState extends State<HisabChatScreen> {
-  // Tailwind Exact Palette
   static const Color oledBg = Color(0xFF000000);
   static const Color surfaceCard = Color(0xFF141416);
   static const Color surfaceSecondary = Color(0xFF18181B);
   static const Color surfaceHighlight = Color(0xFF202024);
   static const Color borderCustom = Color(0xFF242429);
 
-  // Lena / Dena Colors
   static const Color lenaGreen = Color(0xFF10B981);
   static const Color lenaGreenLight = Color(0xFF34D399);
   static const Color denaRed = Color(0xFFF43F5E);
@@ -38,44 +41,18 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
   final TextEditingController _noteController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
-  final List<Map<String, dynamic>> _messages = [
-    {
-      "dateHeader": "28 September 2024",
-      "amount": "50",
-      "typeText": "(Diya)",
-      "isDiya": true,
-      "tag": "UPI",
-      "note": "Chai nashta & patties with friends",
-      "time": "28/9 17:42",
-      "txnId": null,
-      "isPrimary": false,
-      "footerTag": null,
-    },
-    {
-      "dateHeader": "30 September 2024",
-      "amount": "100",
-      "typeText": "(Diya)",
-      "isDiya": true,
-      "tag": "Cash",
-      "note": "dan kar diya bas aise hi",
-      "time": "30/9 21:21",
-      "txnId": "#TXN-8941",
-      "isPrimary": true,
-      "footerTag": null,
-    },
-    {
-      "dateHeader": null,
-      "amount": "50",
-      "typeText": "(Sahil ne diya)",
-      "isDiya": false,
-      "tag": "GPay",
-      "note": "Sahil settled partial amount for previous food",
-      "time": "Today, 10:15 AM",
-      "txnId": null,
-      "isPrimary": false,
-      "footerTag": "Balance adjusted",
-    },
-  ];
+  late Box<FriendModel> _friendsBox;
+  late HisaabEntryService _entryService;
+
+  @override
+  void initState() {
+    super.initState();
+    _friendsBox = Hive.box<FriendModel>('friends_box');
+    _entryService = HisaabEntryService(
+      friendsBox: _friendsBox,
+      transBox: Hive.box('transactions_box'),
+    );
+  }
 
   @override
   void dispose() {
@@ -86,8 +63,8 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
   }
 
   void _addNewEntry() {
-    final amountText = _amountController.text.trim();
-    if (amountText.isEmpty) {
+    final amount = int.tryParse(_amountController.text.trim()) ?? 0;
+    if (amount <= 0) {
       AppToast.show(context, title: "Amount daalein!", type: ToastType.warning);
       return;
     }
@@ -96,26 +73,18 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
         ? (_entryType == 0 ? "Udhar Diya" : "Paisa Liya")
         : _noteController.text.trim();
 
-    setState(() {
-      _messages.add({
-        "dateHeader": null,
-        "amount": amountText,
-        "typeText": _entryType == 0
-            ? "(Diya)"
-            : "(${widget.friendName} ne diya)",
-        "isDiya": _entryType == 0,
-        "tag": _selectedPaymentMode,
-        "note": noteText,
-        "time": "Today, ${TimeOfDay.now().format(context)}",
-        "txnId": "#TXN-${DateTime.now().millisecondsSinceEpoch % 10000}",
-        "isPrimary": false,
-        "footerTag": _entryType == 1 ? "Balance adjusted" : null,
-      });
+    if (widget.friendKey != null) {
+      _entryService.saveTransaction(
+        selectedFriendKeys: {widget.friendKey},
+        totalAmount: amount,
+        txType: _entryType == 0 ? 'diya' : 'liya',
+        note: noteText,
+        paymentMode: _selectedPaymentMode,
+      );
+    }
 
-      _amountController.clear();
-      _noteController.clear();
-    });
-
+    _amountController.clear();
+    _noteController.clear();
     FocusScope.of(context).unfocus();
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -142,503 +111,381 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cleanAmount = widget.netAmount.replaceAll(".00", "");
+    return ValueListenableBuilder<Box<FriendModel>>(
+      valueListenable: _friendsBox.listenable(),
+      builder: (context, box, _) {
+        final FriendModel? currentFriend = widget.friendKey != null
+            ? box.get(widget.friendKey)
+            : null;
 
-    return Scaffold(
-      backgroundColor: oledBg,
-      body: Stack(
-        children: [
-          // ----------------------------------------------------
-          // WhatsApp Style Subtle Dark Background Image Layer (FIXED VISIBILITY)
-          // ----------------------------------------------------
-          Positioned.fill(
-            child: Opacity(
-              opacity:
-                  0.25, // 25% Opacity se pitch dark OLED me image clear dikhegi
-              child: Image.asset(
-                'assets/images/chat_bg.png',
-                fit: BoxFit.cover,
-                repeat: ImageRepeat.repeat,
-                errorBuilder: (context, error, stackTrace) {
-                  return Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Text(
-                        "Image Not Found: assets/images/chat_bg.png check karein!",
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          color: Colors.redAccent.withOpacity(0.5),
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
+        final String displayName = currentFriend?.name ?? widget.friendName;
+        final int currentBalance =
+            currentFriend?.balance ?? (int.tryParse(widget.netAmount) ?? 0);
+        final bool isLena = currentFriend != null
+            ? currentFriend.type == 'lena'
+            : widget.isLena;
+        final bool isSettled = currentBalance == 0;
 
-          // Main Foreground Chat UI
-          SafeArea(
-            child: Column(
-              children: [
-                // Top Navigation & Header
-                Padding(
-                  padding: const EdgeInsets.only(
-                    left: 12,
-                    right: 14,
-                    top: 4,
-                    bottom: 2,
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          GestureDetector(
-                            onTap: _closeChatPage,
-                            behavior: HitTestBehavior.opaque,
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: const BoxDecoration(
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.arrow_back_ios_new_rounded,
-                                color: Color(0xFFA3A3A3),
-                                size: 18,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            widget.friendName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: -0.2,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Container(
-                        width: 32,
-                        height: 32,
-                        alignment: Alignment.center,
-                        child: const Icon(
-                          Icons.more_vert_rounded,
-                          color: Color(0xFFD4D4D4),
-                          size: 18,
-                        ),
-                      ),
-                    ],
+        final historyList = currentFriend?.history ?? [];
+
+        return Scaffold(
+          backgroundColor: oledBg,
+          body: Stack(
+            children: [
+              // Subtle background layer
+              Positioned.fill(
+                child: Opacity(
+                  opacity: 0.25,
+                  child: Image.asset(
+                    'assets/images/chat_bg.png',
+                    fit: BoxFit.cover,
+                    repeat: ImageRepeat.repeat,
+                    errorBuilder: (context, error, stackTrace) =>
+                        const SizedBox.shrink(),
                   ),
                 ),
+              ),
 
-                // Net Balance Master Card
-                Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 6,
-                  ),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: surfaceCard.withOpacity(0.88),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: borderCustom),
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              widget.isLena ? "NET LENA HAI" : "NET DENA HAI",
-                              style: const TextStyle(
-                                color: Color(0xFFA3A3A3),
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 0.8,
+              SafeArea(
+                child: Column(
+                  children: [
+                    // Top Bar
+                    Padding(
+                      padding: const EdgeInsets.only(
+                        left: 12,
+                        right: 14,
+                        top: 4,
+                        bottom: 2,
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              GestureDetector(
+                                onTap: _closeChatPage,
+                                behavior: HitTestBehavior.opaque,
+                                child: Container(
+                                  padding: const EdgeInsets.all(6),
+                                  decoration: const BoxDecoration(
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.arrow_back_ios_new_rounded,
+                                    color: Color(0xFFA3A3A3),
+                                    size: 18,
+                                  ),
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 4),
-                            Row(
-                              crossAxisAlignment: CrossAxisAlignment.baseline,
-                              textBaseline: TextBaseline.alphabetic,
-                              children: [
-                                Text(
-                                  "₹$cleanAmount",
-                                  style: TextStyle(
-                                    color: widget.isLena ? lenaGreen : denaRed,
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: -0.3,
-                                  ),
-                                ),
-                                const SizedBox(width: 6),
-                                Text(
-                                  widget.isLena ? "(Receive)" : "(Pay)",
-                                  style: TextStyle(
-                                    color: widget.isLena
-                                        ? const Color(0xE634D399)
-                                        : const Color(0xE6FB7185),
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: surfaceSecondary,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: borderCustom),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: const [
+                              const SizedBox(width: 4),
                               Text(
-                                "Details",
-                                style: TextStyle(
-                                  color: Color(0xFFD4D4D4),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w500,
+                                displayName,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  letterSpacing: -0.2,
                                 ),
-                              ),
-                              SizedBox(width: 4),
-                              Icon(
-                                Icons.keyboard_arrow_down_rounded,
-                                color: Color(0xFFD4D4D4),
-                                size: 14,
                               ),
                             ],
                           ),
-                        ),
-                      ],
+                          Container(
+                            width: 32,
+                            height: 32,
+                            alignment: Alignment.center,
+                            child: const Icon(
+                              Icons.more_vert_rounded,
+                              color: Color(0xFFD4D4D4),
+                              size: 18,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                ),
 
-                // Scrollable Timeline Chat
-                Expanded(
-                  child: ListView.builder(
-                    controller: _scrollController,
-                    physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    itemCount: _messages.length,
-                    itemBuilder: (context, index) {
-                      final msg = _messages[index];
-                      return Column(
-                        children: [
-                          if (msg["dateHeader"] != null)
-                            Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 10),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: surfaceSecondary.withOpacity(0.85),
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                    color: borderCustom.withOpacity(0.7),
-                                  ),
-                                ),
-                                child: Text(
-                                  msg["dateHeader"],
+                    // Net Balance Card
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 6,
+                      ),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: surfaceCard.withValues(alpha: 0.88),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: borderCustom),
+                        ),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  isSettled
+                                      ? "HISAAB CLEAR (CHUKTA)"
+                                      : (isLena
+                                            ? "NET LENA HAI"
+                                            : "NET DENA HAI"),
                                   style: const TextStyle(
                                     color: Color(0xFFA3A3A3),
-                                    fontSize: 11,
-                                    fontWeight: FontWeight.w600,
-                                    letterSpacing: 0.5,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    letterSpacing: 0.8,
                                   ),
                                 ),
+                                const SizedBox(height: 4),
+                                Row(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.baseline,
+                                  textBaseline: TextBaseline.alphabetic,
+                                  children: [
+                                    Text(
+                                      "₹$currentBalance",
+                                      style: TextStyle(
+                                        color: isSettled
+                                            ? Colors.white70
+                                            : (isLena ? lenaGreen : denaRed),
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w800,
+                                        letterSpacing: -0.3,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      isSettled
+                                          ? "(Settled)"
+                                          : (isLena ? "(Receive)" : "(Pay)"),
+                                      style: TextStyle(
+                                        color: isSettled
+                                            ? Colors.white54
+                                            : (isLena
+                                                  ? const Color(0xE634D399)
+                                                  : const Color(0xE6FB7185)),
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                                vertical: 6,
+                              ),
+                              decoration: BoxDecoration(
+                                color: surfaceSecondary,
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(color: borderCustom),
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Text(
+                                    "Ledger",
+                                    style: TextStyle(
+                                      color: Color(0xFFD4D4D4),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Icon(
+                                    Icons.receipt_long_rounded,
+                                    color: Color(0xFFD4D4D4),
+                                    size: 14,
+                                  ),
+                                ],
                               ),
                             ),
-                          _buildTransactionCard(msg),
-                        ],
-                      );
-                    },
-                  ),
-                ),
+                          ],
+                        ),
+                      ),
+                    ),
 
-                // Bottom Action Dock
-                _buildBottomDock(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
+                    // Scrollable Timeline
+                    Expanded(
+                      child: historyList.isEmpty
+                          ? const Center(
+                              child: Text(
+                                "Abhi tak koi entry nahi hai",
+                                style: TextStyle(
+                                  color: Color(0xFFA3A3A3),
+                                  fontSize: 13,
+                                ),
+                              ),
+                            )
+                          : ListView.builder(
+                              controller: _scrollController,
+                              physics: const BouncingScrollPhysics(),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                              ),
+                              itemCount: historyList.length,
+                              itemBuilder: (context, index) {
+                                final msg = historyList[index];
+                                final isDiya = msg["type"] == 'diya';
 
-  Widget _buildTransactionCard(Map<String, dynamic> msg) {
-    final bool isDiya = msg["isDiya"] == true;
-    final bool isPrimary = msg["isPrimary"] == true;
+                                return Align(
+                                  alignment: isDiya
+                                      ? Alignment.centerRight
+                                      : Alignment.centerLeft,
+                                  child: Container(
+                                    width:
+                                        MediaQuery.of(context).size.width *
+                                        0.85,
+                                    margin: const EdgeInsets.only(bottom: 12),
+                                    padding: const EdgeInsets.all(12),
+                                    decoration: BoxDecoration(
+                                      color:
+                                          (isDiya
+                                                  ? const Color(0xFF121415)
+                                                  : surfaceCard)
+                                              .withValues(alpha: 0.88),
+                                      borderRadius: BorderRadius.only(
+                                        topLeft: const Radius.circular(16),
+                                        bottomLeft: const Radius.circular(16),
+                                        bottomRight: const Radius.circular(16),
+                                        topRight: isDiya
+                                            ? const Radius.circular(4)
+                                            : const Radius.circular(16),
+                                      ),
+                                      border: Border.all(color: borderCustom),
+                                    ),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.only(
+                                            bottom: 6,
+                                          ),
+                                          decoration: const BoxDecoration(
+                                            border: Border(
+                                              bottom: BorderSide(
+                                                color: Color(0x0DFFFFFF),
+                                              ),
+                                            ),
+                                          ),
+                                          child: Row(
+                                            mainAxisAlignment:
+                                                MainAxisAlignment.spaceBetween,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Text(
+                                                    "${isDiya ? '+' : '-'}₹${msg["amount"]}",
+                                                    style: TextStyle(
+                                                      color: isDiya
+                                                          ? lenaGreenLight
+                                                          : denaRed,
+                                                      fontSize: 14,
+                                                      fontWeight:
+                                                          FontWeight.bold,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(width: 4),
+                                                  Text(
+                                                    isDiya
+                                                        ? "(Diya)"
+                                                        : "(Liya)",
+                                                    style: TextStyle(
+                                                      color: isDiya
+                                                          ? const Color(
+                                                              0xCC6EE7B7,
+                                                            )
+                                                          : const Color(
+                                                              0xCCFDA4AF,
+                                                            ),
+                                                      fontSize: 12,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                              Container(
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 8,
+                                                      vertical: 2,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color: surfaceHighlight,
+                                                  borderRadius:
+                                                      BorderRadius.circular(6),
+                                                  border: Border.all(
+                                                    color: borderCustom,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  msg["mode"] ?? "UPI",
+                                                  style: const TextStyle(
+                                                    color: Color(0xFFD4D4D4),
+                                                    fontSize: 10,
+                                                    fontWeight: FontWeight.w600,
+                                                  ),
+                                                ),
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          msg["title"] ?? "Hisaab",
+                                          style: TextStyle(
+                                            color: isDiya
+                                                ? const Color(0xFFE5E5E5)
+                                                : const Color(0xFFD4D4D4),
+                                            fontSize: 12,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.spaceBetween,
+                                          children: [
+                                            const SizedBox.shrink(),
+                                            Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Text(
+                                                  msg["date"] ?? "",
+                                                  style: const TextStyle(
+                                                    color: Color(0xFFD4D4D4),
+                                                    fontSize: 10,
+                                                  ),
+                                                ),
+                                                if (isDiya) ...[
+                                                  const SizedBox(width: 4),
+                                                  const Icon(
+                                                    Icons.done_all_rounded,
+                                                    size: 12,
+                                                    color: lenaGreenLight,
+                                                  ),
+                                                ],
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                    ),
 
-    if (isPrimary) {
-      return Align(
-        alignment: Alignment.centerRight,
-        child: Container(
-          width: MediaQuery.of(context).size.width * 0.88,
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xF0122419), Color(0xF00F1D14)],
-            ),
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(16),
-              bottomLeft: Radius.circular(16),
-              bottomRight: Radius.circular(16),
-              topRight: Radius.circular(4),
-            ),
-            border: Border.all(color: const Color(0x99064E3B)),
-            boxShadow: const [
-              BoxShadow(
-                color: Color(0x33022C22),
-                blurRadius: 10,
-                offset: Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: const [
-                      Text(
-                        "+₹100",
-                        style: TextStyle(
-                          color: Color(0xFF6EE7B7),
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      SizedBox(width: 4),
-                      Text(
-                        "(Diya)",
-                        style: TextStyle(
-                          color: Color(0xE66EE7B7),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: const Color(0xB3022C22),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: const Color(0x66047857)),
-                    ),
-                    child: const Text(
-                      "Cash",
-                      style: TextStyle(
-                        color: Color(0xFFA7F3D0),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.5,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              Text(
-                msg["note"],
-                style: const TextStyle(
-                  color: Color(0xFFECFDF5),
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
-                  letterSpacing: -0.2,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Container(
-                padding: const EdgeInsets.only(top: 6),
-                decoration: const BoxDecoration(
-                  border: Border(top: BorderSide(color: Color(0x4D065F46))),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      msg["txnId"] ?? "",
-                      style: const TextStyle(
-                        fontFamily: 'monospace',
-                        color: Color(0xB334D399),
-                        fontSize: 10,
-                      ),
-                    ),
-                    Row(
-                      children: [
-                        Text(
-                          msg["time"],
-                          style: const TextStyle(
-                            color: Color(0xCC6EE7B7),
-                            fontSize: 11,
-                          ),
-                        ),
-                        const SizedBox(width: 3),
-                        const Icon(
-                          Icons.done_all_rounded,
-                          size: 14,
-                          color: Color(0xFF34D399),
-                        ),
-                      ],
-                    ),
+                    // Bottom Dock
+                    _buildBottomDock(),
                   ],
                 ),
               ),
             ],
           ),
-        ),
-      );
-    }
-
-    return Align(
-      alignment: isDiya ? Alignment.centerRight : Alignment.centerLeft,
-      child: Container(
-        width: MediaQuery.of(context).size.width * 0.85,
-        margin: const EdgeInsets.only(bottom: 12),
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: (isDiya ? const Color(0xFF121415) : surfaceCard).withOpacity(
-            0.88,
-          ),
-          borderRadius: BorderRadius.only(
-            topLeft: const Radius.circular(16),
-            bottomLeft: const Radius.circular(16),
-            bottomRight: const Radius.circular(16),
-            topRight: isDiya
-                ? const Radius.circular(4)
-                : const Radius.circular(16),
-          ),
-          border: Border.all(color: borderCustom),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.only(bottom: 6),
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Color(0x0DFFFFFF))),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Row(
-                    children: [
-                      Text(
-                        "${isDiya ? '+' : '-'}₹${msg["amount"]}",
-                        style: TextStyle(
-                          color: isDiya ? lenaGreenLight : denaRed,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        msg["typeText"],
-                        style: TextStyle(
-                          color: isDiya
-                              ? const Color(0xCC6EE7B7)
-                              : const Color(0xCCFDA4AF),
-                          fontSize: 12,
-                          fontWeight: FontWeight.normal,
-                        ),
-                      ),
-                    ],
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: surfaceHighlight,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: borderCustom),
-                    ),
-                    child: Text(
-                      msg["tag"],
-                      style: const TextStyle(
-                        color: Color(0xFFD4D4D4),
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              msg["note"],
-              style: TextStyle(
-                color: isDiya
-                    ? const Color(0xFFE5E5E5)
-                    : const Color(0xFFD4D4D4),
-                fontSize: 12,
-                fontWeight: FontWeight.normal,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                if (msg["footerTag"] != null)
-                  Text(
-                    msg["footerTag"],
-                    style: const TextStyle(color: lenaGreenLight, fontSize: 10),
-                  )
-                else
-                  const SizedBox.shrink(),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      msg["time"],
-                      style: const TextStyle(
-                        color: Color(0xFFD4D4D4),
-                        fontSize: 10,
-                      ),
-                    ),
-                    if (isDiya) ...[
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.done_all_rounded,
-                        size: 12,
-                        color: lenaGreenLight,
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -646,13 +493,12 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
       decoration: BoxDecoration(
-        color: oledBg.withOpacity(0.96),
+        color: oledBg.withValues(alpha: 0.96),
         border: const Border(top: BorderSide(color: borderCustom)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Row 1: Note Input Field
           Container(
             height: 44,
             padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -674,7 +520,7 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
                     controller: _noteController,
                     style: const TextStyle(color: Colors.white, fontSize: 13),
                     decoration: const InputDecoration(
-                      hintText: "Hisaab ka note likhein (e.g. Chai, Udhaar, Saman)...",
+                      hintText: "Hisaab ka note likhein...",
                       hintStyle: TextStyle(
                         color: Color(0xFF737373),
                         fontSize: 12,
@@ -755,14 +601,11 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
               ],
             ),
           ),
-
           const SizedBox(height: 10),
-
-          // Row 2: Diya / Liya Toggle
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: surfaceSecondary.withOpacity(0.9),
+              color: surfaceSecondary.withValues(alpha: 0.9),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: borderCustom),
             ),
@@ -851,10 +694,7 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
               ],
             ),
           ),
-
           const SizedBox(height: 10),
-
-          // Row 3: Amount + Save + Close Button
           Row(
             children: [
               Expanded(
@@ -901,10 +741,7 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
                   ),
                 ),
               ),
-
               const SizedBox(width: 10),
-
-              // Save Button
               GestureDetector(
                 onTap: _addNewEntry,
                 child: Container(
@@ -921,9 +758,9 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
                       ),
                     ],
                   ),
-                  child: Row(
+                  child: const Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: const [
+                    children: [
                       Text(
                         "Save",
                         style: TextStyle(
@@ -939,10 +776,7 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
                   ),
                 ),
               ),
-
               const SizedBox(width: 10),
-
-              // ✕ Close Button
               GestureDetector(
                 onTap: _closeChatPage,
                 child: Container(
@@ -964,9 +798,7 @@ class _HisabChatScreenState extends State<HisabChatScreen> {
               ),
             ],
           ),
-
           const SizedBox(height: 12),
-
           Container(
             width: 128,
             height: 4,
